@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeShellExecution": [
+      {
+        "type": "command",
+        "command": "python .cursor/hooks/shell-policy.py",
+        "timeout": 5
+      }
+    ]
+  }
+}

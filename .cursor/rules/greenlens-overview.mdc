@@ -1,0 +1,20 @@
+---
+alwaysApply: true
+---
+
+# GreenLens AI — Tổng quan
+
+Đọc và bám sát kế hoạch cốt lõi (kiến trúc phase 0–9, BR, endpoint):
+
+@docs/AI_Service_Development_Plan.md
+
+Tóm tắt không thay cho file trên:
+
+- **Vai trò:** FastAPI microservice ô nhiễm — .NET và mobile có thể gọi song song hai luồng: on-device `.tflite`, server inference + EXIF / pHash / manipulation / severity.
+- **Chi tiết theo backlog:** `@docs/plans/` (plan kỹ cho từng phase hoặc spike).
+- **Subagents (Cursor):** `@.cursor/agents/` — tầng (`greenlens-api-v1`, `greenlens-core-services`, `greenlens-ml-artifacts`, `greenlens-test-br`, `greenlens-docker-infra`), **`greenlens-scout`** (read-only recon), **`greenlens-debug`**, và **`greenlens-contract-audit`** (read-only audit). Slash command **`/execute`**, **`/plan`**, **`/fix`**, **`/debug`** trong `.cursor/commands/` đã gán bảng subagent tương ứng. Gọi `/tên-agent` hoặc để Cursor delegate ([`Subagents`](https://cursor.com/docs/subagents.md)).
+- **Cấu trúc đích repo:** `app/` (api, core, services, workers, models), `ml/` (train, export, weights), `tests/`, `docker/`, `scripts/`.
+
+Quy giản:
+
+- Inference quan trọng gắn `model_version`, logging phục vụ audit BR-AI-005 khi chức năng đã có.

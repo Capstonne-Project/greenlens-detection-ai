@@ -1,0 +1,15 @@
+---
+description: YOLO train/export — Ultralytics weights, artifacts ngoài git, MODEL_CARD khi release
+globs: ml/**/*
+alwaysApply: false
+---
+
+# ML (`ml/`)
+
+@docs/AI_Service_Development_Plan.md
+
+- **Bố cục:** `ml/training/`, `ml/export/`, `ml/notebooks/`, `ml/weights/` — dataset YOLO-format, config `data.yaml`; Ultralytics YOLOv8/v11.
+- **Không commit** file nặng (`.pt`, `.tflite`, dataset lớn): dùng DVC/S3/MLflow theo plan; chỉ script + config + docs trong git.
+- **Export mobile:** INT8 `.tflite` + `labels.txt`; ghi rõ input shape, preprocess, postprocess trong `docs/MODEL_CARD.md` khi có bản release.
+- **Server:** Ưu tiên ONNX runtime khi tích hợp; mọi response inference có `model_version`.
+- **Độ chính xác:** Track mAP, confusion; ghi limitation (VD: “noise” không từ ảnh — Option A trong plan).

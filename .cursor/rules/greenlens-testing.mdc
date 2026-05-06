@@ -1,0 +1,15 @@
+---
+description: pytest layout — fixtures ảnh/EXIF, map test ↔ BR và ma trận traceability trong plan
+globs: tests/**/*.py
+alwaysApply: false
+---
+
+# Testing
+
+@docs/AI_Service_Development_Plan.md
+
+- **Runner:** `pytest`, `pytest-asyncio`, HTTP qua `httpx`/`TestClient` cho integration.
+- **Layout:** `tests/unit/`, `tests/integration/`, `tests/fixtures/` (ảnh mẫu EXIF/GPS/trùng lặp theo Phase 1–2 plan).
+- **Traceability:** Tên test gợi nhớ BR (xem ma trận §7 trong `docs/AI_Service_Development_Plan.md`).
+- **Thực đơn:** Mỗi endpoint mới có ít nhất happy path + 1 edge case quan trọng (timezone EXIF, ảnh mất EXIF, gps ngoài VN, v.v.).
+- **Chạy:** `uv run pytest` (hoặc tooling repo đã cấu hình).

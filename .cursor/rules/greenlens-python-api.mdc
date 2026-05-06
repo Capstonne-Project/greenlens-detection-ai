@@ -1,0 +1,16 @@
+---
+description: FastAPI app layout — routes thin, core logic, pydantic-settings, BR/API contract
+globs: app/**/*.py
+alwaysApply: false
+---
+
+# App Python (`app/`)
+
+@docs/AI_Service_Development_Plan.md
+
+- **Entry:** FastAPI trong `app/main.py`; versioning API dưới `app/api/v1/`.
+- **Config:** `pydantic-settings` (`app/config.py`), không hardcode secrets; đồng bộ `.env.example`.
+- **Endpoints theo plan:** `health` + `/ready`; sau này `verify-image`, `check-duplicate`, `classify`, `batch-analyze`, `verify-cleanup` — schema request/response như trong `docs/AI_Service_Development_Plan.md`.
+- **Layers:** Route mỏng → logic trong `app/core/` (YOLO wrapper, geo, EXIF, duplicate, …) → `app/services/` (Redis, storage). DI tập trung (`deps` khi có).
+- **Timeout / resilience:** Giữ budget ~4.5s cho server inference khi integrate BR-AI-006; 202 + worker sau.
+- **Style:** Khớp `pyproject.toml` / pre-commit (ruff, v.v.); ưu tiên async cho I/O; type hints rõ cho public API.
