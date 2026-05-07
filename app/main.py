@@ -1,12 +1,17 @@
 """FastAPI application entry point."""
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import health
+from app.api.v1 import classify, health
 from app.config import get_settings
 from app.utils.logger import get_logger, setup_logging
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+_DEMO_STATIC = _REPO_ROOT / "static" / "demo"
 
 
 @asynccontextmanager
@@ -31,6 +36,14 @@ app = FastAPI(
 )
 
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(classify.router, prefix="/api/v1")
+
+if _DEMO_STATIC.is_dir():
+    app.mount(
+        "/demo",
+        StaticFiles(directory=str(_DEMO_STATIC), html=False),
+        name="demo",
+    )
 
 
 @app.get("/")
@@ -39,4 +52,5 @@ async def root():
         "service": "ai-service",
         "version": "0.1.0",
         "docs": "/docs",
+        "demo_capture_classify": "/demo/demo_capture_classify.html",
     }

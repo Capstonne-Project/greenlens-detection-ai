@@ -32,8 +32,31 @@ class Settings(BaseSettings):
     s3_bucket: str = "ai-service"
 
     # AI
-    model_path: str = "ml/weights/yolov8n.pt"
+    model_path: str = "ml/weights/yolov8n.pt"  # missing file -> classify stub mode (CI)
+    model_version: str = "v0.1.0-yolov8n"  # BR-AI-005 audit string on classify
     inference_timeout_seconds: float = 4.5
+
+    classification_confidence_auto: float = 0.8
+    classification_confidence_suggest_low: float = 0.5
+
+    # Severity (BR-AI-003 v1): polluted bbox area sum / image area — band upper edges
+    severity_cover_low_below: float = 0.05
+    severity_cover_medium_below: float = 0.15
+    severity_cover_high_below: float = 0.40
+
+    # Mapped pollution box confidence floor for POLLUTION_LIKELY
+    relevance_min_confidence: float = 0.3
+
+    suspicious_edit_time_diff_hours: float = 1.0
+    duplicate_phash_similarity_threshold: float = 0.85
+    duplicate_max_distance_meters: float = 50.0
+    duplicate_max_time_diff_hours: float = 24.0
+
+    # True -> no S3 upload; return placeholder stripped_image_url (local dev)
+    storage_stub_mode: bool = True
+
+    # Local UI only: when weights file missing, return a fake SUGGEST row (BR-AI-001 demo).
+    classify_demo_mode: bool = False
 
 
 @lru_cache

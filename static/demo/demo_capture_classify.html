@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GreenLens — Demo chụp ảnh &amp; xác nhận loại ô nhiễm</title>
+  <style>
+    :root { font-family: system-ui, sans-serif; line-height: 1.4; }
+    body { max-width: 36rem; margin: 1rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.2rem; }
+    fieldset { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    button, select, input[type="file"] { font: inherit; margin: 0.25rem 0.5rem 0.25rem 0; }
+    #preview { max-width: 100%; border-radius: 8px; margin-top: 0.5rem; }
+    #result { white-space: pre-wrap; background: #f6f6f6; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; }
+    .row { margin: 0.5rem 0; }
+    .muted { color: #555; font-size: 0.85rem; }
+    .pill { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 999px; background: #e8f4ea; }
+  </style>
+</head>
+<body>
+  <h1>Demo: chụp / chọn ảnh → AI gợi ý loại → bạn xác nhận</h1>
+  <p class="muted">Mở qua API: <code>http://127.0.0.1:8000/demo/demo_capture_classify.html</code></p>
+  <p class="muted">
+    Nếu bạn thấy <strong>KEEP_USER_CHOICE</strong>, <strong>predictions []</strong>, <strong>confidence 0</strong>:
+    thường là chưa có file weights tại <code>MODEL_PATH</code>, hoặc model không phải bản huấn luyện ô nhiễm (COCO không map TRASH/WATER/…).
+    Để demo không cần weights: trong <code>.env</code> đặt <code>CLASSIFY_DEMO_MODE=true</code> rồi khởi động lại server — trả ví dụ <code>SUGGEST</code>;
+    <code>model_version</code> sẽ có hậu tố <code>+demo-no-weights</code>.
+  </p>
+
+  <fieldset>
+    <legend>1. Ảnh</legend>
+    <div class="row">
+      <input id="fileInput" type="file" accept="image/*" capture="environment" />
+    </div>
+    <img id="preview" alt="Xem trước" hidden />
+  </fieldset>
+
+  <fieldset>
+    <legend>2. Gọi AI</legend>
+    <button type="button" id="analyzeBtn" disabled>Phân loại</button>
+    <span id="busy" class="muted" hidden>Đang xử lý…</span>
+    <div id="result">Chưa có kết quả.</div>
+  </fieldset>
+
+  <fieldset>
+    <legend>3. Xác nhận loại (người dùng)</legend>
+    <label for="pickType">Loại bạn xác nhận:</label>
+    <select id="pickType">
+      <option value="">— Chọn —</option>
+      <option value="TRASH">TRASH — Rác thải</option>
+      <option value="WATER">WATER — Nước thải</option>
+      <option value="SMOKE">SMOKE — Khói / khí</option>
+      <option value="CHEMICAL">CHEMICAL — Hóa chất</option>
+      <option value="NOISE" disabled title="AI không infer tiếng ồn (Option A)">NOISE — Tiếng ồn</option>
+    </select>
+    <button type="button" id="confirmBtn" disabled>Ghi nhận lựa chọn</button>
+    <div id="confirmNote" class="muted row"></div>
+  </fieldset>
+
+  <script>
+    (function () {
+      var fileInput = document.getElementById("fileInput");
+      var preview = document.getElementById("preview");
+      var analyzeBtn = document.getElementById("analyzeBtn");
+      var busy = document.getElementById("busy");
+      var resultEl = document.getElementById("result");
+      var pickType = document.getElementById("pickType");
+      var confirmBtn = document.getElementById("confirmBtn");
+      var confirmNote = document.getElementById("confirmNote");
+
+      var lastPayload = null;
+      var noiseSupported = false;
+
+      function setText(el, text) {
+        while (el.firstChild) el.removeChild(el.firstChild);
+        el.appendChild(document.createTextNode(text));
+      }
+
+      fileInput.addEventListener("change", function () {
+        lastPayload = null;
+        confirmBtn.disabled = true;
+        setText(confirmNote, "");
+        analyzeBtn.disabled = !fileInput.files || !fileInput.files.length;
+        if (!fileInput.files || !fileInput.files.length) {
+          preview.hidden = true;
+          return;
+        }
+        var url = URL.createObjectURL(fileInput.files[0]);
+        preview.src = url;
+        preview.hidden = false;
+      });
+
+      analyzeBtn.addEventListener("click", function () {
+        if (!fileInput.files || !fileInput.files.length) return;
+        var fd = new FormData();
+        fd.append("image", fileInput.files[0]);
+
+        busy.hidden = false;
+        analyzeBtn.disabled = true;
+        setText(resultEl, "Đang gửi…");
+
+        fetch("/api/v1/classify-upload", { method: "POST", body: fd })
+          .then(function (r) {
+            return r.json().then(function (j) {
+              if (!r.ok) throw new Error(j.detail || r.statusText || String(r.status));
+              return j;
+            });
+          })
+          .then(function (data) {
+            lastPayload = data;
+            noiseSupported = !!data.noise_supported;
+
+            pickType.options[5].disabled = !noiseSupported;
+            pickType.selectedIndex = 0;
+            confirmBtn.disabled = false;
+
+            if (data.primary_class) pickType.value = data.primary_class;
+            else pickType.selectedIndex = 0;
+
+            var lines = [];
+            if (data.model_version && String(data.model_version).includes("demo-no-weights")) {
+              lines.push("⚠ Kết quả DEMO (không có weights thật — chỉ để thử UI)");
+            }
+            lines.push("action: " + data.action);
+            lines.push("severity: " + data.severity + " (BR-AI-003 v1 — tỷ lệ vùng ô nhiễm trên ảnh)");
+            lines.push("pollution_coverage_ratio: " + data.pollution_coverage_ratio);
+            lines.push("image_relevance: " + data.image_relevance);
+            lines.push("  → POLLUTION_LIKELY: nên là cảnh báo cáo ô nhiễm | NOT_...: nghi ảnh không liên quan | UNCLEAR: cần người duyệt");
+            lines.push("primary_class (loại ô nhiễm chính): " + (data.primary_class || "(none)"));
+            lines.push("confidence: " + data.confidence);
+            lines.push("model_version: " + data.model_version);
+            lines.push("inference_time_ms: " + data.inference_time_ms);
+            lines.push("noise_supported: " + data.noise_supported);
+            lines.push("predictions: " + JSON.stringify(data.predictions));
+            setText(resultEl, lines.join("\n"));
+          })
+          .catch(function (e) {
+            setText(resultEl, "Lỗi: " + e.message);
+            lastPayload = null;
+            confirmBtn.disabled = true;
+          })
+          .finally(function () {
+            busy.hidden = true;
+            analyzeBtn.disabled = !fileInput.files || !fileInput.files.length;
+          });
+      });
+
+      confirmBtn.addEventListener("click", function () {
+        var v = pickType.value;
+        if (!v) {
+          setText(confirmNote, "Hãy chọn một loại trước khi xác nhận.");
+          return;
+        }
+        var suggested = lastPayload ? lastPayload.primary_class : null;
+        var action = lastPayload ? lastPayload.action : null;
+        var msg = "Đã ghi nhận (demo client-only): confirmed_type=" + v;
+        if (suggested) msg += ", ai_suggestion=" + suggested + ", ai_action=" + action;
+        setText(confirmNote, msg);
+      });
+    })();
+  </script>
+</body>
+</html>
