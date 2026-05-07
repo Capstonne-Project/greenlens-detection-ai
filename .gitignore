@@ -30,6 +30,7 @@ ml/weights/*.pt
 ml/weights/*.tflite
 ml/weights/*.onnx
 ml/training/data/
+ml/training/runs/
 
 # Test
 .pytest_cache/

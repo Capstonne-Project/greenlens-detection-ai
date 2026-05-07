@@ -21,4 +21,7 @@ async def test_ready_returns_ready():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         response = await ac.get("/api/v1/ready")
     assert response.status_code == 200
-    assert response.json()["status"] == "ready"
+    payload = response.json()
+    assert payload["status"] == "ready"
+    assert payload["service"] == "ai-service"
+    assert "model_loaded" in payload
