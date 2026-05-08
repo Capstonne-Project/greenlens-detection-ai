@@ -36,6 +36,11 @@ ImageRelevance = Literal[
 ]
 
 SeverityBand = Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+ReportImageDecision = Literal[
+    "ACCEPTABLE_REPORT_IMAGE",
+    "NEED_MANUAL_REVIEW",
+    "IRRELEVANT_OR_SUSPECTED_ABUSIVE",
+]
 
 
 class ClassifyResponse(BaseModel):
@@ -81,3 +86,9 @@ class ClassifyResponse(BaseModel):
             "Ảnh có phải cảnh báo cáo ô nhiễm thuyết phục không, hay nghi không liên quan / cần người xem."
         ),
     )
+
+
+class ClassifyModerationResponse(BaseModel):
+    decision: ReportImageDecision
+    reason: str
+    classify: ClassifyResponse

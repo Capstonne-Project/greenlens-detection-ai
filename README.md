@@ -11,6 +11,27 @@ uv run uvicorn app.main:app --reload
 
 Mở: http://localhost:8000/docs
 
+## Local Fine-Tuning Dashboard (upload -> normalize -> train)
+
+Dashboard demo (local training orchestration): `http://localhost:8000/demo/demo_training_dashboard.html`
+
+Supported flow:
+
+1. Upload dataset zip with YOLO folders:
+   - `images/train`, `images/val`, `labels/train`, `labels/val`
+2. Service normalizes labels (class id + bbox range clamp) and stores dataset metadata.
+3. Create local training job (background) from web UI.
+4. Poll realtime logs + status + latest metrics from `results.csv`.
+5. Optional W&B logging (`enable_wandb` + project/entity/API key or local `WANDB_API_KEY`).
+
+New endpoints:
+
+- `POST /api/v1/training/datasets/upload`
+- `POST /api/v1/training/jobs`
+- `GET /api/v1/training/jobs`
+- `GET /api/v1/training/jobs/{job_id}`
+- `GET /api/v1/training/jobs/{job_id}/logs?offset=0&limit=20000`
+
 ## Run with Docker
 
 ```cmd
@@ -61,6 +82,7 @@ uv run pytest -v
 
 4) Kiểm tra model load thật
 Mở:
+uv run uvicorn app.main:app
 
 http://127.0.0.1:8000/api/v1/ready
 Kỳ vọng:

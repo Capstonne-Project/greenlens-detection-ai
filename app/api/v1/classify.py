@@ -5,7 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.api.deps import get_pollution_classifier_cached
-from app.models.classify import ClassificationPrediction, ClassifyRequest, ClassifyResponse
+from app.models.classify import (
+    ClassificationPrediction,
+    ClassifyModerationResponse,
+    ClassifyRequest,
+    ClassifyResponse,
+)
 from app.services import storage_service
 from app.utils.logger import get_logger
 
@@ -53,6 +58,23 @@ def _log_classify(logger, response: ClassifyResponse) -> None:
         severity=response.severity,
         image_relevance=response.image_relevance,
         coverage=response.pollution_coverage_ratio,
+    )
+
+
+def _moderation_from_classify(response: ClassifyResponse) -> tuple[str, str]:
+    if response.image_relevance == "POLLUTION_LIKELY":
+        return (
+            "ACCEPTABLE_REPORT_IMAGE",
+            "Mapped pollution evidence is strong enough for report workflow.",
+        )
+    if response.image_relevance == "UNCLEAR_NEED_MANUAL_REVIEW":
+        return (
+            "NEED_MANUAL_REVIEW",
+            "Image has low-confidence or unmapped objects; require manual review.",
+        )
+    return (
+        "IRRELEVANT_OR_SUSPECTED_ABUSIVE",
+        "No mapped pollution evidence; likely irrelevant upload or suspicious content.",
     )
 
 
@@ -107,3 +129,20 @@ async def classify_upload(
     _log_classify(logger, response)
 
     return response
+
+
+@router.post(
+    "/classify-moderation-upload",
+    response_model=ClassifyModerationResponse,
+    response_model_by_alias=True,
+    summary="Classify pollution + report-image moderation decision",
+)
+async def classify_moderation_upload(
+    image: Annotated[
+        UploadFile,
+        File(description="Camera capture or gallery file for moderation-aware classify."),
+    ],
+) -> ClassifyModerationResponse:
+    response = await classify_upload(image)
+    decision, reason = _moderation_from_classify(response)
+    return ClassifyModerationResponse(decision=decision, reason=reason, classify=response)

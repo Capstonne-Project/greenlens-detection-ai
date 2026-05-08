@@ -41,6 +41,12 @@ def main() -> int:
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="DataLoader worker processes (set 0 for safer web/background runs on Windows).",
+    )
     parser.add_argument("--project", default="ml/training/runs")
     parser.add_argument("--name", default="pollution_detect")
     args = parser.parse_args()
@@ -56,6 +62,7 @@ def main() -> int:
     print("data:", data_path)
     print("model:", ckpt)
     print("epochs:", args.epochs, "| imgsz:", args.imgsz, "| batch:", args.batch)
+    print("workers:", args.workers)
 
     runs_project = (_PROJECT_ROOT / args.project).resolve()
     runs_project.mkdir(parents=True, exist_ok=True)
@@ -66,6 +73,7 @@ def main() -> int:
         epochs=args.epochs,
         imgsz=args.imgsz,
         batch=args.batch,
+        workers=args.workers,
         project=str(runs_project),
         name=args.name,
         exist_ok=True,

@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>GreenLens — Training dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --surface: rgba(255, 255, 255, 0.72);
+        --surface-strong: rgba(255, 255, 255, 0.9);
+        --stroke: rgba(255, 255, 255, 0.55);
+        --line: rgba(15, 23, 42, 0.08);
+        --text: #0f172a;
+        --muted: #64748b;
+        --brand: #059669;
+        --brand-deep: #047857;
+        --brand-glow: rgba(16, 185, 129, 0.45);
+        --sky: #0ea5e9;
+        --accent-glow: rgba(14, 165, 233, 0.22);
+        --success-bg: #ecfdf5;
+        --success-fg: #047857;
+        --terminal: #0c1222;
+        --terminal-border: rgba(52, 211, 153, 0.12);
+        --terminal-fg: #86efac;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --shadow-soft: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+        --shadow-lift: 0 24px 48px -12px rgba(15, 23, 42, 0.12), 0 12px 24px -8px rgba(15, 23, 42, 0.08);
+        --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", Consolas, monospace;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-sans);
+        color: var(--text);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        background-color: #e8eef5;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.52;
+        z-index: 0;
+        pointer-events: none;
+      }
+      body::before {
+        width: min(72vw, 680px);
+        height: min(72vw, 680px);
+        top: -16%;
+        right: -14%;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.5) 0%, rgba(14, 165, 233, 0.12) 58%, transparent 72%);
+        animation: drift-a 20s ease-in-out infinite;
+      }
+      body::after {
+        width: min(88vw, 780px);
+        height: min(88vw, 780px);
+        bottom: -28%;
+        left: -18%;
+        background: radial-gradient(circle, rgba(14, 165, 233, 0.32) 0%, rgba(5, 150, 105, 0.12) 48%, transparent 70%);
+        animation: drift-b 24s ease-in-out infinite;
+      }
+      @keyframes drift-a {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        50% {
+          transform: translate(-3%, 4%) scale(1.06);
+        }
+      }
+      @keyframes drift-b {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        50% {
+          transform: translate(4%, -3%) scale(1.07);
+        }
+      }
+
+      .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: clamp(1.15rem, 3.5vw, 2rem) clamp(1rem, 3vw, 1.5rem) 3rem;
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.28rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--brand-deep);
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(236, 253, 245, 0.92));
+        border: 1px solid rgba(16, 185, 129, 0.28);
+        box-shadow: 0 2px 12px rgba(5, 150, 105, 0.12);
+        margin-bottom: 0.85rem;
+      }
+      .hero-badge .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+      }
+
+      .brand-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 1rem 1.2rem;
+        margin-bottom: 0;
+      }
+      .logo-wrap {
+        position: relative;
+        flex-shrink: 0;
+      }
+      .logo-mark {
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: 18px;
+        background: linear-gradient(145deg, #10b981 0%, #059669 45%, #047857 100%);
+        box-shadow:
+          0 12px 28px var(--brand-glow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        display: grid;
+        place-items: center;
+      }
+      .logo-mark svg {
+        width: 1.45rem;
+        height: 1.45rem;
+        color: #fff;
+      }
+      .logo-glow {
+        position: absolute;
+        inset: -8px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), transparent 60%);
+        z-index: -1;
+        filter: blur(12px);
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: clamp(1.38rem, 3.8vw, 1.82rem);
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1.18;
+        background: linear-gradient(118deg, #0f172a 0%, #1e293b 38%, #047857 105%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .subtitle {
+        margin: 0.5rem 0 0;
+        font-size: 0.95rem;
+        color: var(--muted);
+        max-width: 52rem;
+      }
+
+      .tab-bar {
+        display: inline-flex;
+        padding: 4px;
+        margin-top: 1.35rem;
+        margin-bottom: 1.65rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .tab-bar a {
+        padding: 0.45rem 1.05rem;
+        border-radius: 999px;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        text-decoration: none;
+        color: var(--muted);
+        transition:
+          color 0.2s,
+          background 0.2s,
+          box-shadow 0.2s;
+      }
+      .tab-bar a:hover:not(.active) {
+        color: var(--brand-deep);
+        background: rgba(255, 255, 255, 0.65);
+      }
+      .tab-bar a.active {
+        color: #fff;
+        background: linear-gradient(180deg, #10b981, #059669);
+        box-shadow:
+          0 6px 20px rgba(5, 150, 105, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      .tab-bar a:focus-visible {
+        outline: 2px solid var(--sky);
+        outline-offset: 2px;
+      }
+
+      .card {
+        position: relative;
+        padding: 1.2rem 1.35rem 1.38rem;
+        margin-bottom: 1.05rem;
+        border-radius: var(--radius-lg);
+        background: linear-gradient(145deg, var(--surface) 0%, var(--surface-strong) 100%);
+        border: 1px solid var(--stroke);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(20px) saturate(1.35);
+        -webkit-backdrop-filter: blur(20px) saturate(1.35);
+        transition:
+          transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          box-shadow 0.35s ease;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lift);
+      }
+      .card-top-shine {
+        position: absolute;
+        top: 0;
+        left: 10%;
+        right: 10%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+        pointer-events: none;
+      }
+
+      .card h3 {
+        margin: 0 0 0.92rem;
+        font-size: 0.9375rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 0.52rem;
+      }
+      .step-num {
+        display: grid;
+        place-items: center;
+        width: 1.85rem;
+        height: 1.85rem;
+        border-radius: 11px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: var(--brand-deep);
+        background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+        border: 1px solid rgba(16, 185, 129, 0.22);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      }
+
+      .card > p.intro {
+        margin: -0.35rem 0 1rem;
+        font-size: 0.895rem;
+        color: var(--muted);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.78rem;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.38rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      input[type="text"],
+      input[type="number"],
+      input[type="file"] {
+        width: 100%;
+        padding: 0.58rem 0.72rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--text);
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      input:focus {
+        outline: none;
+        border-color: rgba(5, 150, 105, 0.45);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+      input[type="file"] {
+        border-style: dashed;
+        border-width: 2px;
+        background: rgba(248, 250, 252, 0.9);
+        cursor: pointer;
+        font-weight: 600;
+      }
+      input[type="file"]:hover {
+        border-color: rgba(5, 150, 105, 0.4);
+        background: rgba(236, 253, 245, 0.45);
+      }
+      input:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        background: #f1f5f9;
+      }
+
+      fieldset {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 0.88rem 1rem;
+        margin: 0.55rem 0 1rem;
+        background: rgba(248, 250, 252, 0.65);
+      }
+      legend {
+        padding: 0 0.4rem;
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .radio-row label {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 0.55rem;
+        margin-bottom: 0.52rem;
+        font-size: 0.8625rem;
+        font-weight: 600;
+        line-height: 1.42;
+      }
+      .radio-row label:last-child {
+        margin-bottom: 0;
+      }
+      input[type="radio"] {
+        margin-top: 0.28rem;
+        accent-color: var(--brand);
+      }
+
+      label.checkbox-row {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      input[type="checkbox"] {
+        width: auto;
+        accent-color: var(--brand);
+      }
+
+      button {
+        position: relative;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-sans);
+        font-weight: 700;
+        font-size: 0.875rem;
+        padding: 0.62rem 1.28rem;
+        cursor: pointer;
+        margin-top: 0.7rem;
+        transition:
+          transform 0.14s ease,
+          filter 0.2s,
+          box-shadow 0.2s;
+        overflow: hidden;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--sky);
+        outline-offset: 3px;
+      }
+      button:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+
+      button.primary {
+        margin-right: 0.55rem;
+        color: #fff;
+        background: linear-gradient(180deg, #10b981 0%, #059669 55%, #047857 100%);
+        box-shadow:
+          0 8px 24px rgba(5, 150, 105, 0.38),
+          inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      }
+      button.primary::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.16) 50%, transparent 60%);
+        transform: translateX(-100%);
+        transition: transform 0.55s ease;
+      }
+      button.primary:hover:not(:disabled)::after {
+        transform: translateX(100%);
+      }
+      button.primary:hover:not(:disabled) {
+        filter: brightness(1.05);
+        box-shadow: 0 10px 32px rgba(5, 150, 105, 0.45);
+      }
+
+      button.secondary {
+        color: var(--brand-deep);
+        background: rgba(255, 255, 255, 0.92);
+        border: 1.5px solid rgba(16, 185, 129, 0.35);
+        box-shadow: 0 2px 10px rgba(5, 150, 105, 0.08);
+        margin-right: 0;
+      }
+      button.secondary:hover:not(:disabled) {
+        background: #ecfdf5;
+      }
+
+      .result {
+        margin-top: 0.95rem;
+        padding: 0.72rem 0.92rem;
+        border-radius: var(--radius-sm);
+        background: rgba(248, 250, 252, 0.95);
+        border: 1px dashed rgba(100, 116, 139, 0.28);
+        font-size: 0.8725rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.72rem;
+        margin-bottom: 1rem;
+        align-items: center;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+      .pill {
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 0.35rem;
+        border-radius: 999px;
+        padding: 0.28rem 0.72rem;
+        font-size: 0.765rem;
+        font-weight: 700;
+        background: rgba(238, 242, 255, 0.95);
+        color: #4338ca;
+        border: 1px solid rgba(129, 140, 248, 0.25);
+      }
+      .pill.ok-pill {
+        background: var(--success-bg);
+        color: var(--success-fg);
+        border-color: rgba(16, 185, 129, 0.25);
+      }
+
+      .terminal {
+        border-radius: var(--radius-md);
+        background: var(--terminal);
+        border: 1px solid var(--terminal-border);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          0 18px 48px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+      .terminal-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.5rem 0.82rem;
+        background: rgba(15, 23, 42, 0.65);
+        border-bottom: 1px solid rgba(52, 211, 153, 0.12);
+      }
+      .terminal-bar span {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+      .terminal-bar span:nth-child(1) {
+        background: #f87171;
+      }
+      .terminal-bar span:nth-child(2) {
+        background: #fbbf24;
+      }
+      .terminal-bar span:nth-child(3) {
+        background: #34d399;
+        margin-right: auto;
+      }
+      .terminal-bar .terminal-title {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: rgba(134, 239, 172, 0.6);
+        text-transform: uppercase;
+        font-family: var(--font-mono);
+      }
+      #logBox {
+        margin: 0;
+        padding: 0.92rem 1rem 1.15rem;
+        min-height: 248px;
+        max-height: 460px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        line-height: 1.45;
+        color: var(--terminal-fg);
+      }
+      #logBox::-webkit-scrollbar {
+        width: 9px;
+      }
+      #logBox::-webkit-scrollbar-thumb {
+        background: rgba(52, 211, 153, 0.28);
+        border-radius: 999px;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.78em;
+        font-weight: 500;
+        background: rgba(14, 165, 233, 0.12);
+        color: #0c4a6e;
+        padding: 0.12rem 0.38rem;
+        border-radius: 6px;
+      }
+      #latestMetric {
+        font-weight: 500;
+        font-size: 0.78rem;
+      }
+
+      footer.site-foot {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="hero">
+        <div class="hero-badge"><span class="dot" aria-hidden="true"></span> GreenLens</div>
+        <div class="brand-row">
+          <div class="logo-wrap">
+            <div class="logo-glow" aria-hidden="true"></div>
+            <div class="logo-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M4 17V9l8-5 8 5v8l-8 5-8-5z"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M12 8v8M8 11l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                  stroke-linecap="round"
+                  opacity="0.9"
+                />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <h1 class="page-title">Fine-tuning — ZIP dataset → chuẩn hóa → train → log realtime</h1>
+            <p class="subtitle">
+              Chạy cùng server FastAPI (<code>/api/v1/training/*</code>). Checkpoint mặc định học tiếp từ job thành công
+              gần nhất.
+            </p>
+          </div>
+        </div>
+        <nav class="tab-bar" aria-label="Điều hướng ">
+          <a href="/demo/demo_capture_classify.html">Phân loại</a>
+          <a href="/demo/demo_training_dashboard.html" class="active">Huấn luyện</a>
+        </nav>
+      </header>
+
+      <div class="card">
+        <div class="card-top-shine" aria-hidden="true"></div>
+        <h3><span class="step-num">1</span> Upload dataset ZIP</h3>
+        <p class="intro">
+          Cấu trúc: <code>images/train</code>, <code>images/val</code>, <code>labels/train</code>,
+          <code>labels/val</code>.
+        </p>
+        <input id="datasetZip" type="file" accept=".zip" />
+        <button class="secondary" type="button" id="uploadBtn">Upload và chuẩn hóa</button>
+        <p id="datasetResult" class="result"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-top-shine" aria-hidden="true"></div>
+        <h3><span class="step-num">2</span> Cấu hình training</h3>
+        <div class="form-grid">
+          <label>Dataset ID <input id="datasetId" type="text" placeholder="ds_xxxxx" /></label>
+          <label>Run name <input id="runName" type="text" value="pollution_detect" /></label>
+          <label>Epochs <input id="epochs" type="number" value="50" min="1" /></label>
+          <label>Batch <input id="batch" type="number" value="16" min="1" /></label>
+          <label>Kích thước ảnh <input id="imgsz" type="number" value="640" min="128" /></label>
+        </div>
+        <fieldset>
+          <legend>Checkpoint</legend>
+          <div class="radio-row">
+            <label
+              ><input type="radio" name="ckptMode" id="ckptAutoLatest" value="auto_latest" checked /> Tự học tiếp từ job
+              <code>SUCCEEDED</code> gần nhất (khuyên dùng)</label
+            >
+            <label
+              ><input type="radio" name="ckptMode" id="ckptFromJob" value="from_job" /> Theo đúng
+              <code>job_id</code></label
+            >
+            <label
+              ><input type="radio" name="ckptMode" id="ckptExplicitPath" value="explicit_path" /> Đường dẫn model thủ
+              công (<code>.pt</code>)</label
+            >
+          </div>
+        </fieldset>
+        <div class="form-grid">
+          <label>Tiếp tục từ job_id <input id="continueFromJobId" type="text" placeholder="job_xxxxx" /></label>
+          <label>Model path <input id="modelPath" type="text" placeholder="ml/weights/best.pt" /></label>
+        </div>
+        <div class="form-grid" style="margin-top: 0.35rem">
+          <label class="checkbox-row"><input id="wandbEnabled" type="checkbox" /> Bật Weights &amp; Biases</label>
+          <label>W&amp;B project <input id="wandbProject" type="text" placeholder="greenlens-training" /></label>
+          <label>W&amp;B entity <input id="wandbEntity" type="text" placeholder="team hoặc username" /></label>
+          <label
+            >W&amp;B API key (tuỳ chọn) <input id="wandbKey" type="text" placeholder="ưu tiên env WANDB_API_KEY"
+          /></label>
+        </div>
+        <button class="primary" type="button" id="startBtn">Start training</button>
+        <p id="jobResult" class="result"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-top-shine" aria-hidden="true"></div>
+        <h3><span class="step-num">3</span> Trạng thái và log</h3>
+        <div class="status-row">
+          <div>Job: <span id="currentJob" class="pill">(none)</span></div>
+          <div>Trạng thái: <span id="jobStatus" class="pill ok-pill">IDLE</span></div>
+          <div>Metrics: <code id="latestMetric">n/a</code></div>
+        </div>
+        <div class="terminal" role="region" aria-label="Training log">
+          <div class="terminal-bar">
+            <span></span><span></span><span></span><span class="terminal-title">training log</span>
+          </div>
+          <div id="logBox"></div>
+        </div>
+      </div>
+
+      <footer class="site-foot">GreenLens Detection AI · chỉ là giao diện cục bộ</footer>
+    </div>
+
+    <script>
+      const uploadBtn = document.getElementById("uploadBtn");
+      const startBtn = document.getElementById("startBtn");
+      const datasetResult = document.getElementById("datasetResult");
+      const jobResult = document.getElementById("jobResult");
+      const currentJobEl = document.getElementById("currentJob");
+      const jobStatusEl = document.getElementById("jobStatus");
+      const latestMetricEl = document.getElementById("latestMetric");
+      const logBox = document.getElementById("logBox");
+      const ckptAutoLatest = document.getElementById("ckptAutoLatest");
+      const ckptFromJob = document.getElementById("ckptFromJob");
+      const ckptExplicitPath = document.getElementById("ckptExplicitPath");
+      const continueFromJobIdEl = document.getElementById("continueFromJobId");
+      const modelPathEl = document.getElementById("modelPath");
+
+      let activeJobId = "";
+      let logOffset = 0;
+      let pollHandle = null;
+
+      function updateCheckpointFieldState() {
+        continueFromJobIdEl.disabled = !ckptFromJob.checked;
+        modelPathEl.disabled = !ckptExplicitPath.checked;
+      }
+      ckptAutoLatest.addEventListener("change", updateCheckpointFieldState);
+      ckptFromJob.addEventListener("change", updateCheckpointFieldState);
+      ckptExplicitPath.addEventListener("change", updateCheckpointFieldState);
+      updateCheckpointFieldState();
+
+      uploadBtn.onclick = async () => {
+        const f = document.getElementById("datasetZip").files[0];
+        if (!f) {
+          datasetResult.textContent = "Vui lòng chọn file ZIP.";
+          return;
+        }
+        const form = new FormData();
+        form.append("dataset_zip", f, f.name);
+        datasetResult.textContent = "Đang upload và chuẩn hóa…";
+        try {
+          const resp = await fetch("/api/v1/training/datasets/upload", { method: "POST", body: form });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Upload failed");
+          datasetResult.textContent = `OK — dataset_id=${data.dataset_id} | ảnh=${data.summary.image_count} | nhãn=${data.summary.label_count} | invalid_lines=${data.summary.invalid_lines}`;
+          document.getElementById("datasetId").value = data.dataset_id;
+        } catch (err) {
+          datasetResult.textContent = `Lỗi upload: ${err.message}`;
+        }
+      };
+
+      startBtn.onclick = async () => {
+        const ckptMode = document.querySelector("input[name='ckptMode']:checked")?.value || "auto_latest";
+        const continueFromJobId = continueFromJobIdEl.value.trim();
+        const modelPath = modelPathEl.value.trim();
+        const body = {
+          dataset_id: document.getElementById("datasetId").value.trim(),
+          run_name: document.getElementById("runName").value.trim() || "pollution_detect",
+          epochs: Number(document.getElementById("epochs").value),
+          batch: Number(document.getElementById("batch").value),
+          imgsz: Number(document.getElementById("imgsz").value),
+          model_path: null,
+          continue_from_latest: ckptMode === "auto_latest",
+          continue_from_job_id: null,
+          enable_wandb: document.getElementById("wandbEnabled").checked,
+          wandb_project: document.getElementById("wandbProject").value.trim() || null,
+          wandb_entity: document.getElementById("wandbEntity").value.trim() || null,
+          wandb_api_key: document.getElementById("wandbKey").value.trim() || null,
+        };
+        if (ckptMode === "from_job") {
+          if (!continueFromJobId) {
+            jobResult.textContent = "Đã chọn tiếp tục theo job_id — nhập job_id.";
+            return;
+          }
+          body.continue_from_job_id = continueFromJobId;
+        } else if (ckptMode === "explicit_path") {
+          if (!modelPath) {
+            jobResult.textContent = "Đã chọn model_path — nhập đường dẫn .pt.";
+            return;
+          }
+          body.model_path = modelPath;
+        }
+        jobResult.textContent = "Đang tạo training job…";
+        try {
+          const resp = await fetch("/api/v1/training/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Create job failed");
+          activeJobId = data.job_id;
+          currentJobEl.textContent = activeJobId;
+          jobResult.textContent = `Đã tạo job: ${data.job_id} (${data.status})`;
+          logOffset = 0;
+          logBox.textContent = "";
+          beginPolling();
+        } catch (err) {
+          jobResult.textContent = `Tạo job lỗi: ${err.message}`;
+        }
+      };
+
+      function beginPolling() {
+        if (pollHandle) window.clearInterval(pollHandle);
+        pollHandle = window.setInterval(async () => {
+          if (!activeJobId) return;
+          try {
+            const [jobResp, logResp] = await Promise.all([
+              fetch(`/api/v1/training/jobs/${activeJobId}`),
+              fetch(`/api/v1/training/jobs/${activeJobId}/logs?offset=${logOffset}&limit=4000`),
+            ]);
+            const job = await jobResp.json();
+            const log = await logResp.json();
+            if (!jobResp.ok) throw new Error(job.detail || "job fetch failed");
+            if (!logResp.ok) throw new Error(log.detail || "log fetch failed");
+            jobStatusEl.textContent = job.status;
+            jobStatusEl.className = "pill";
+            jobStatusEl.style.background = "";
+            jobStatusEl.style.color = "";
+            if (job.status === "SUCCEEDED") jobStatusEl.classList.add("ok-pill");
+            if (job.status === "FAILED") {
+              jobStatusEl.style.background = "#fef2f2";
+              jobStatusEl.style.color = "#b91c1c";
+            } else if (job.status === "RUNNING") {
+              jobStatusEl.style.background = "#eff6ff";
+              jobStatusEl.style.color = "#1d4ed8";
+            } else if (job.status === "QUEUED") {
+              jobStatusEl.style.background = "#fffbeb";
+              jobStatusEl.style.color = "#92400e";
+            }
+            if (job.metrics && job.metrics.latest) {
+              latestMetricEl.textContent = JSON.stringify(job.metrics.latest);
+            }
+            if (log.content) {
+              logBox.textContent += log.content;
+              logBox.scrollTop = logBox.scrollHeight;
+            }
+            logOffset = log.next_offset || logOffset;
+            if (job.status === "SUCCEEDED" || job.status === "FAILED") {
+              if (job.result) {
+                jobResult.textContent = `Hoàn thành: ${job.status} | best=${job.result.best_model_path || "n/a"} | csv=${job.result.results_csv || "n/a"}`;
+              }
+              window.clearInterval(pollHandle);
+              pollHandle = null;
+            }
+          } catch (err) {
+            jobResult.textContent = `Poll lỗi: ${err.message}`;
+          }
+        }, 2000);
+      }
+    </script>
+  </body>
+</html>
