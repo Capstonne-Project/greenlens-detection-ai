@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate YOLO layout for pollution training (TRASH/WATER/SMOKE/CHEMICAL).
+"""Validate YOLO layout for pollution training (TRASH/WATER/SMOKE).
 
 Usage (from repo root):
   uv run python ml/training/scripts/verify_yolo_dataset.py --root ml/training/data/pollution
@@ -33,7 +33,7 @@ def main() -> int:
         default=Path("ml/training/data/pollution"),
         help="Root folder with images/{train,val} and labels/{train,val}.",
     )
-    parser.add_argument("--nc", type=int, default=4, help="Expected number of classes (0..nc-1).")
+    parser.add_argument("--nc", type=int, default=3, help="Expected number of classes (0..nc-1).")
     args = parser.parse_args()
     root = args.root.resolve()
 
@@ -94,7 +94,7 @@ def main() -> int:
                     issues.append(f"Orphan label (no image base name): {lab.name}")
 
     print("Root:", root)
-    print(f"Expected classes: 0=TRASH 1=WATER 2=SMOKE 3=CHEMICAL (nc={args.nc})")
+    print(f"Expected classes: 0=TRASH 1=WATER 2=SMOKE (nc={args.nc})")
     print("Total bbox lines:", bbox_total)
     for split, counts in sorted(per_split_class.items()):
         print(f"  [{split}] bbox per class:", dict(counts))
@@ -107,10 +107,10 @@ def main() -> int:
             missing_classes.append(c)
 
     if missing_classes:
-        names = ["TRASH", "WATER", "SMOKE", "CHEMICAL"]
+        names = ["TRASH", "WATER", "SMOKE"]
         for c in missing_classes:
             print(
-                f"WARN: no examples for class {c} ({names[c] if c < 4 else '?'}) — model will not learn it."
+                f"WARN: no examples for class {c} ({names[c] if c < 3 else '?'}) — model will not learn it."
             )
 
     if issues:

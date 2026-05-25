@@ -5,6 +5,16 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+class DetectedBox(BaseModel):
+    """Tọa độ pixel của một bounding box (absolute, xyxy format)."""
+
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
 class ClassificationPrediction(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -12,7 +22,7 @@ class ClassificationPrediction(BaseModel):
         ...,
         serialization_alias="class",
         description=(
-            "BR-REP-005 scene category: TRASH / WATER / SMOKE / CHEMICAL "
+            "BR-REP-005 scene category: TRASH / WATER / SMOKE "
             "(detector aggregates; tiếng ồn do user nhập)."
         ),
     )
@@ -22,6 +32,11 @@ class ClassificationPrediction(BaseModel):
     bbox_count: int = Field(
         ge=0,
         description="Số bbox góp vào chứng cứ của loại ô nhiễm (không phải SKU từng món).",
+    )
+
+    boxes: list[DetectedBox] = Field(
+        default_factory=list,
+        description="Tọa độ pixel (xyxy) của từng bounding box thuộc loại ô nhiễm này.",
     )
 
 
@@ -60,7 +75,35 @@ class ClassifyResponse(BaseModel):
 
     action: Literal["AUTO_FILL", "SUGGEST", "KEEP_USER_CHOICE"]
 
-    model_version: str
+    model_version: str = Field(
+        description=(
+            "Composite audit string: YOLO version and scene status, e.g. "
+            "'v1.4.0-yolo|scene:v1.0.0-scene' or 'v1.4.0-yolo|scene:off'."
+        ),
+    )
+
+    yolo_active: bool = Field(
+        description="True when YOLO detector weights were loaded and used for this request.",
+    )
+
+    scene_classifier_active: bool = Field(
+        description="True when scene classifier weights were loaded and ran for this request.",
+    )
+
+    detector_model_version: str | None = Field(
+        default=None,
+        description="MODEL_VERSION from settings when YOLO is active; null when YOLO is off.",
+    )
+
+    scene_model_version: str | None = Field(
+        default=None,
+        description="SCENE_CLASSIFIER_VERSION when scene model is active; null when scene is off.",
+    )
+
+    scene_scores: dict[str, float] | None = Field(
+        default=None,
+        description="WATER/SMOKE probabilities from scene classifier when active.",
+    )
 
     inference_time_ms: float = Field(ge=0.0)
 

@@ -14,7 +14,13 @@ class DatasetUploadResponse(BaseModel):
 
 
 class CreateTrainingJobRequest(BaseModel):
-    dataset_id: str
+    dataset_id: str = Field(
+        default="", description="Single dataset ID. Ignored khi dataset_ids có >= 2 phần tử."
+    )
+    dataset_ids: list[str] | None = Field(
+        default=None,
+        description="Danh sách dataset_id để gộp lại trước khi train. Ưu tiên cao hơn dataset_id.",
+    )
     run_name: str = Field(default="pollution_detect")
     epochs: int = Field(default=50, ge=1, le=1000)
     batch: int = Field(default=16, ge=1, le=1024)
@@ -40,6 +46,27 @@ class CreateTrainingJobRequest(BaseModel):
     )
 
 
+class MergeDatasetsRequest(BaseModel):
+    dataset_ids: list[str] = Field(
+        min_length=2,
+        description="Danh sách dataset_id cần gộp (tối thiểu 2).",
+    )
+
+
+class TrainingJobListResponse(BaseModel):
+    items: list[TrainingJobResponse]
+    total: int
+    limit: int
+    offset: int
+
+
+class SceneTrainingJobListResponse(BaseModel):
+    items: list[SceneTrainingJobResponse]
+    total: int
+    limit: int
+    offset: int
+
+
 class TrainingJobResponse(BaseModel):
     job_id: str
     status: Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"]
@@ -55,6 +82,7 @@ class TrainingJobResponse(BaseModel):
     error_text: str | None = None
     metrics: dict | None = None
     log_size_bytes: int | None = None
+    dataset_summary: dict | None = None
 
 
 class TrainingLogResponse(BaseModel):
@@ -63,3 +91,57 @@ class TrainingLogResponse(BaseModel):
     eof: bool
     total_size: int | None = None
     status: str | None = None
+
+
+# --- Dataset inspect / convert schemas ---
+
+
+class DatasetInspectResponse(BaseModel):
+    yaml_file: str | None
+    detected_classes: dict[int, str]
+    target_classes: dict[int, str]
+
+
+class DatasetConvertRequest(BaseModel):
+    mapping: dict[str, str] = Field(
+        description='Map source class name or int id (as str) to target: {"Plastic Trash": "TRASH"}'
+    )
+
+
+# --- Scene Classifier training schemas ---
+
+
+class SceneDatasetUploadResponse(BaseModel):
+    dataset_id: str
+    created_at: str
+    summary: dict
+
+
+class CreateSceneTrainingJobRequest(BaseModel):
+    dataset_id: str
+    run_name: str = Field(default="scene_classifier")
+    epochs: int = Field(default=15, ge=1, le=1000)
+    batch: int = Field(default=16, ge=1, le=512)
+    lr: float = Field(default=1e-4, gt=0.0, le=1.0)
+    output_path: str | None = Field(
+        default=None,
+        description="Where to save best.pt. Defaults to ml/weights/scene_classifier.pt.",
+    )
+
+
+class SceneTrainingJobResponse(BaseModel):
+    job_id: str
+    status: Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"]
+    dataset_id: str
+    run_name: str
+    created_at: str
+    updated_at: str
+    epochs: int
+    batch: int
+    lr: float
+    data_root: str
+    output_path: str
+    result: dict | None = None
+    error_text: str | None = None
+    log_size_bytes: int | None = None
+    dataset_summary: dict | None = None

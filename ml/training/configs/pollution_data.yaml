@@ -13,15 +13,14 @@
 # các tọa độ chuẩn hóa 0–1 so với kích thước ảnh (định dạng YOLO).
 #
 # class_id theo đúng thứ tự dưới đây (phải khớp với app classify):
-#   0 TRASH, 1 WATER, 2 SMOKE, 3 CHEMICAL
+#   0 TRASH, 1 WATER, 2 SMOKE
 
 path: ml/training/data/pollution
 train: images/train
 val: images/val
 
-nc: 4
+nc: 3
 names:
   0: TRASH
   1: WATER
   2: SMOKE
-  3: CHEMICAL

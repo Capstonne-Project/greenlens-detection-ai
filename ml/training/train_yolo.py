@@ -26,7 +26,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Train pollution YOLO (TRASH/WATER/SMOKE/CHEMICAL)."
+        description="Train pollution YOLO (TRASH/WATER/SMOKE) — 3 classes, joint training."
     )
     parser.add_argument(
         "--data",
@@ -80,11 +80,22 @@ def main() -> int:
     )
 
     out = runs_project / args.name / "weights" / "best.pt"
-    print("\nTraining finished. Typical best weights path:")
-    print(out.resolve())
-    print("\nCopy to ml/weights/ and set MODEL_PATH in .env, e.g.")
+    out_abs = out.resolve()
+    weights_dest = (_PROJECT_ROOT / "ml" / "weights" / "best.pt").resolve()
+
+    print("\n" + "=" * 60)
+    print("[DONE] Training finished!")
+    print("=" * 60)
+    print(f"  best.pt  : {out_abs}")
+    print(f"  exists   : {out_abs.is_file()}")
+    print()
+    print("--- Paste vao .env ---------------------------------")
     print("  MODEL_PATH=ml/weights/best.pt")
-    print("Also bump MODEL_VERSION for audit logs.")
+    print(f"  MODEL_VERSION=v?.?.0-<ten_dataset>-{args.epochs}ep")
+    print()
+    print("--- Copy lenh (chay tu repo root) ------------------")
+    print(f'  copy "{out_abs}" "{weights_dest}"')
+    print("=" * 60)
     return 0
 
 

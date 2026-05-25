@@ -1,48 +1,110 @@
-# Python
+# ===== Python =====
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# ===== Virtual environments =====
 .venv/
 venv/
 env/
 ENV/
+
+# ===== uv =====
+.uv-cache/
+
+# ===== Package build =====
 *.egg-info/
 dist/
 build/
+*.whl
 
-# uv
-.uv-cache/
-
-# IDE
+# ===== IDE =====
 .vscode/
 .idea/
 *.swp
 *.swo
+*.suo
+*.user
 
-# Env
+# ===== Environment / secrets =====
 .env
 .env.local
+.env.*.local
 
-# Models (lớn, không commit)
+# ===== ML — model weights (binary, lớn) =====
+*.pt
 ml/weights/*.pt
-ml/weights/*.tflite
+ml/weights/*.pth
 ml/weights/*.onnx
+ml/weights/*.tflite
+ml/weights/*.engine
+# Giữ lại .gitkeep để thư mục tồn tại trong repo
+!ml/weights/.gitkeep
+
+# ===== ML — dataset images & labels (không commit raw data) =====
 ml/training/data/
+ml/training/uploads/
+
+# ===== ML — training runs & artifacts =====
 ml/training/runs/
 
-# Test
+# ===== ML — export artifacts =====
+ml/export/
+
+# ===== Ảnh rác ở root (không thuộc source code) =====
+*.jpg
+*.jpeg
+*.png
+*.bmp
+*.webp
+*.tiff
+*.gif
+# Ngoại lệ: ảnh trong static/ là asset của frontend
+!static/**/*.jpg
+!static/**/*.jpeg
+!static/**/*.png
+!static/**/*.svg
+!static/**/*.gif
+!static/**/*.webp
+
+# ===== SQLite database (runtime state, không commit) =====
+*.sqlite3
+*.sqlite
+*.db
+
+# ===== Testing =====
 .pytest_cache/
 .coverage
 htmlcov/
+coverage.xml
+
+# ===== Type checking & linting cache =====
 .mypy_cache/
 .ruff_cache/
+.dmypy.json
 
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
+# ===== Logs =====
 *.log
 logs/
+
+# ===== OS =====
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ===== Claude Code internal =====
+.claude/worktrees/
+
+# ===== Jupyter =====
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# ===== Zip artifacts tạm (uploads do user tạo ra) =====
+*.zip

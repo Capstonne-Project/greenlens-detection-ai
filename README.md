@@ -85,6 +85,8 @@ Mở:
 uv run uvicorn app.main:app
 
 http://127.0.0.1:8000/api/v1/ready
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
 Kỳ vọng:
 
 "model_loaded": true
@@ -92,3 +94,78 @@ Kỳ vọng:
 http://127.0.0.1:8000/demo/demo_capture_classify.html
 Hoặc /docs gọi POST /api/v1/classify-upload
 Quan sát các field:
+
+
+Bước 1 — Mày push code (làm ngay)
+
+git add -A
+git commit -m "chore: training config + retrain action plan"
+git push origin dev
+Bước 2 — Người kia pull + setup môi trường
+
+git clone <repo_url>
+cd greenlens-detection-ai
+uv sync                                          # cài dependencies
+copy .env.example .env                           # tạo .env
+# Sửa .env: CLASSIFY_DEMO_MODE=false, MODEL_PATH=ml/weights/best.pt
+uv run python scripts/download_baseline_weights.py  # tự download yolov8n.pt
+Bước 3 — Share dataset (phần tốn công nhất)
+Mày có 2 cách:
+
+Cách A — USB/Google Drive (đơn giản)
+
+
+Copy toàn bộ D:\CapsoneProject\DATASETFINAL\ → USB → qua máy kia
+Cách B — Roboflow (sạch hơn, vì dataset của mày từ Roboflow)
+
+Share workspace Roboflow với người kia
+Họ export lại → upload qua Training Dashboard
+Bước 4 — Người kia start server + train
+
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+# Mở http://localhost:8000/static/demo/demo_training_dashboard.html
+# Upload dataset ZIP → Cấu hình train → Start
+Tóm tắt
+Thứ	Cách share
+Code	git push ✅
+yolov8n.pt	Script tự download ✅
+Dataset	USB hoặc Roboflow share ⚠️
+.env	Tự tạo từ .env.example ✅
+Mày muốn tao giúp viết .env.example đầy đủ không để người kia setup dễ hơn?
+
+khi người kia train xong thì kêu ng đó gửi những gì cho tui để tui set được bên tui ?
+Chỉ cần 1 file duy nhất
+
+best.pt
+Đường dẫn đầy đủ trên máy người kia:
+
+
+ml/training/runs/web_jobs/<job_id>/output/pollution_detect/weights/best.pt
+Sau khi nhận được best.pt
+Bước 1 — Copy vào đúng chỗ:
+
+
+Copy-Item "best.pt" "ml\weights\best.pt" -Force
+Bước 2 — Cập nhật .env:
+
+
+MODEL_PATH=ml/weights/best.pt
+MODEL_VERSION=v3.0.0-3class-150ep-1280px
+Bước 3 — Restart server:
+
+
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+Nếu muốn có thêm số liệu để viết paper
+Kêu người kia gửi thêm 2 file này:
+
+File	Dùng để làm gì
+results.csv	Bảng mAP50 theo từng epoch → vẽ biểu đồ
+args.yaml	Xác nhận config đúng (imgsz=1280, yolov8n.pt sạch)
+Cả 2 file nằm cùng thư mục với best.pt:
+
+
+ml/training/runs/web_jobs/<job_id>/output/pollution_detect/
+├── weights/
+│   └── best.pt        ← bắt buộc
+├── results.csv         ← cần cho paper
+└── args.yaml           ← để verify

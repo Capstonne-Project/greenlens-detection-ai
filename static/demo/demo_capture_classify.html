@@ -482,19 +482,24 @@
       height: 2.25rem;
       opacity: 0.45;
     }
-    .preview-frame.has-image #preview {
-      display: block;
-    }
     .preview-frame.has-image .preview-placeholder {
       display: none;
     }
     #preview {
       display: none;
-      width: 100%;
-      height: 100%;
       max-height: 340px;
+      max-width: 100%;
       object-fit: contain;
       vertical-align: middle;
+    }
+    .preview-frame.has-image #preview {
+      display: block;
+    }
+    #detectionCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
     }
 
     .card-head-sub {
@@ -762,6 +767,7 @@
               Chưa có ảnh
             </div>
             <img id="preview" alt="Ảnh xem trước" />
+            <canvas id="detectionCanvas"></canvas>
           </div>
         </div>
       </div>
@@ -809,6 +815,8 @@
       var fileZone = document.getElementById("fileZone");
       var preview = document.getElementById("preview");
       var previewFrame = document.getElementById("previewFrame");
+      var canvas = document.getElementById("detectionCanvas");
+      var ctx = canvas.getContext("2d");
       var analyzeBtn = document.getElementById("analyzeBtn");
       var busy = document.getElementById("busy");
       var resultEl = document.getElementById("result");
@@ -821,6 +829,19 @@
       var lastPreviewUrl = null;
       var dragDepth = 0;
 
+      // Màu cho từng loại ô nhiễm (border, fill với alpha)
+      var CLASS_COLORS = {
+        TRASH:    { stroke: "#f59e0b", fill: "rgba(245,158,11,0.12)",    label: "#92400e" },
+        WATER:    { stroke: "#0ea5e9", fill: "rgba(14,165,233,0.12)",    label: "#0369a1" },
+        SMOKE:    { stroke: "#94a3b8", fill: "rgba(148,163,184,0.12)",   label: "#475569" },
+        CHEMICAL: { stroke: "#8b5cf6", fill: "rgba(139,92,246,0.12)",    label: "#5b21b6" },
+      };
+      var DEFAULT_COLOR = { stroke: "#10b981", fill: "rgba(16,185,129,0.12)", label: "#047857" };
+
+      function getColor(cls) {
+        return CLASS_COLORS[cls] || DEFAULT_COLOR;
+      }
+
       function setText(el, text) {
         while (el.firstChild) el.removeChild(el.firstChild);
         el.appendChild(document.createTextNode(text));
@@ -831,11 +852,106 @@
         confirmNote.style.display = text ? "block" : "none";
       }
 
+      function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+
+      function drawBoxes(predictions) {
+        // Lấy kích thước img đang render trong DOM
+        var dispW = preview.offsetWidth;
+        var dispH = preview.offsetHeight;
+        if (!dispW || !dispH) return;
+
+        // naturalWidth/naturalHeight là kích thước ảnh gốc mà server nhận
+        var natW = preview.naturalWidth || dispW;
+        var natH = preview.naturalHeight || dispH;
+
+        // Tính offset do object-fit: contain tạo ra letterbox
+        var scaleX = dispW / natW;
+        var scaleY = dispH / natH;
+        var scale = Math.min(scaleX, scaleY);
+        var renderW = natW * scale;
+        var renderH = natH * scale;
+        var offX = (dispW - renderW) / 2;
+        var offY = (dispH - renderH) / 2;
+
+        // Căn canvas với img element
+        var imgRect = preview.getBoundingClientRect();
+        var frameRect = previewFrame.getBoundingClientRect();
+        canvas.width = dispW;
+        canvas.height = dispH;
+        canvas.style.width = dispW + "px";
+        canvas.style.height = dispH + "px";
+        canvas.style.top = (imgRect.top - frameRect.top) + "px";
+        canvas.style.left = (imgRect.left - frameRect.left) + "px";
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        var FONT_SIZE = Math.max(11, Math.round(renderH * 0.038));
+        ctx.font = "700 " + FONT_SIZE + "px 'JetBrains Mono', monospace";
+
+        predictions.forEach(function (pred) {
+          var boxes = pred.boxes || [];
+          if (!boxes.length) return;
+          var cls = pred["class"] || pred.pollutant_kind || "?";
+          var color = getColor(cls);
+
+          boxes.forEach(function (b) {
+            var bx1 = offX + b.x1 * scale;
+            var by1 = offY + b.y1 * scale;
+            var bx2 = offX + b.x2 * scale;
+            var by2 = offY + b.y2 * scale;
+            var bw = bx2 - bx1;
+            var bh = by2 - by1;
+
+            // Fill
+            ctx.fillStyle = color.fill;
+            ctx.fillRect(bx1, by1, bw, bh);
+
+            // Border
+            ctx.strokeStyle = color.stroke;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(bx1, by1, bw, bh);
+
+            // Label tag
+            var pct = Math.round((b.confidence || pred.confidence) * 100);
+            var label = cls + " " + pct + "%";
+            var textW = ctx.measureText(label).width;
+            var tagH = FONT_SIZE + 8;
+            var tagX = bx1;
+            var tagY = by1 - tagH;
+            if (tagY < 0) tagY = by1;
+
+            ctx.fillStyle = color.stroke;
+            // Rounded rect cho label
+            var r = 4;
+            ctx.beginPath();
+            ctx.moveTo(tagX + r, tagY);
+            ctx.lineTo(tagX + textW + 10 - r, tagY);
+            ctx.quadraticCurveTo(tagX + textW + 10, tagY, tagX + textW + 10, tagY + r);
+            ctx.lineTo(tagX + textW + 10, tagY + tagH - r);
+            ctx.quadraticCurveTo(tagX + textW + 10, tagY + tagH, tagX + textW + 10 - r, tagY + tagH);
+            ctx.lineTo(tagX + r, tagY + tagH);
+            ctx.quadraticCurveTo(tagX, tagY + tagH, tagX, tagY + tagH - r);
+            ctx.lineTo(tagX, tagY + r);
+            ctx.quadraticCurveTo(tagX, tagY, tagX + r, tagY);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.fillStyle = "#fff";
+            ctx.fillText(label, tagX + 5, tagY + FONT_SIZE + 2);
+          });
+        });
+      }
+
       function applyPreviewFromInput() {
         if (lastPreviewUrl) {
           URL.revokeObjectURL(lastPreviewUrl);
           lastPreviewUrl = null;
         }
+        clearCanvas();
         if (!fileInput.files || !fileInput.files.length) {
           previewFrame.classList.remove("has-image");
           preview.removeAttribute("src");
@@ -893,6 +1009,7 @@
         busy.hidden = false;
         analyzeBtn.disabled = true;
         setText(resultEl, "Đang gửi…");
+        clearCanvas();
 
         fetch("/api/v1/classify-upload", { method: "POST", body: fd })
           .then(function (r) {
@@ -912,6 +1029,19 @@
             if (data.primary_class) pickType.value = data.primary_class;
             else pickType.selectedIndex = 0;
 
+            // Vẽ bounding boxes lên canvas
+            var hasBboxes = data.predictions && data.predictions.some(function (p) {
+              return p.boxes && p.boxes.length > 0;
+            });
+            if (hasBboxes) {
+              // Đợi img render xong rồi mới vẽ
+              if (preview.complete && preview.naturalWidth) {
+                drawBoxes(data.predictions);
+              } else {
+                preview.onload = function () { drawBoxes(data.predictions); };
+              }
+            }
+
             var lines = [];
             if (data.model_version && String(data.model_version).includes("demo-no-weights")) {
               lines.push("Cảnh báo: kết quả DEMO (chưa có weights thật — chỉ để thử UI)");
@@ -923,10 +1053,18 @@
             lines.push("  → POLLUTION_LIKELY: cảnh báo cảnh ô nhiễm | NOT_*: ảnh không liên quan | UNCLEAR: cần duyệt");
             lines.push("primary_class (loại ô nhiễm chính): " + (data.primary_class || "(none)"));
             lines.push("confidence: " + data.confidence);
-            lines.push("model_version: " + data.model_version);
+            lines.push("model_version (audit): " + data.model_version);
+            lines.push("yolo_active: " + data.yolo_active + " | detector_model_version: " + (data.detector_model_version || "(off)"));
+            lines.push(
+              "scene_classifier_active: " + data.scene_classifier_active +
+              " | scene_model_version: " + (data.scene_model_version || "(off)")
+            );
+            if (data.scene_scores) {
+              lines.push("scene_scores (WATER/SMOKE): " + JSON.stringify(data.scene_scores));
+            }
             lines.push("inference_time_ms: " + data.inference_time_ms);
             lines.push("noise_supported: " + data.noise_supported);
-            lines.push("predictions: " + JSON.stringify(data.predictions));
+            lines.push("predictions: " + JSON.stringify(data.predictions, null, 2));
             setText(resultEl, lines.join("\n"));
           })
           .catch(function (e) {

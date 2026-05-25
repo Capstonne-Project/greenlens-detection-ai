@@ -10,6 +10,7 @@ from app.models.classify import (
     ClassifyModerationResponse,
     ClassifyRequest,
     ClassifyResponse,
+    DetectedBox,
 )
 from app.services import storage_service
 from app.utils.logger import get_logger
@@ -30,6 +31,7 @@ def classify_image_bytes_to_response(image_bytes: bytes) -> ClassifyResponse:
             pollutant_kind=p["class"],
             confidence=float(p["confidence"]),
             bbox_count=int(p["bbox_count"]),
+            boxes=[DetectedBox(**b) for b in p.get("boxes", [])],
         )
         for p in result.predictions
     ]
@@ -40,6 +42,11 @@ def classify_image_bytes_to_response(image_bytes: bytes) -> ClassifyResponse:
         confidence=float(result.confidence),
         action=result.action,  # type: ignore[arg-type]
         model_version=result.model_version,
+        yolo_active=result.yolo_active,
+        scene_classifier_active=result.scene_classifier_active,
+        detector_model_version=result.detector_model_version,
+        scene_model_version=result.scene_model_version,
+        scene_scores=result.scene_scores,
         inference_time_ms=result.inference_time_ms,
         noise_supported=result.noise_supported,
         severity=result.severity,  # type: ignore[arg-type]
@@ -55,6 +62,8 @@ def _log_classify(logger, response: ClassifyResponse) -> None:
         action=response.action,
         inference_ms=response.inference_time_ms,
         model_version=response.model_version,
+        yolo_active=response.yolo_active,
+        scene_classifier_active=response.scene_classifier_active,
         severity=response.severity,
         image_relevance=response.image_relevance,
         coverage=response.pollution_coverage_ratio,
