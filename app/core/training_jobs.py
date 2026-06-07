@@ -7,6 +7,7 @@ import csv
 import io
 import json
 import os
+import random
 import shutil
 import sqlite3
 import subprocess
@@ -25,6 +26,7 @@ from app.utils.logger import get_logger
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 _TRAIN_SCRIPT = _PROJECT_ROOT / "ml" / "training" / "train_yolo.py"
 _SCENE_TRAIN_SCRIPT = _PROJECT_ROOT / "ml" / "training" / "train_scene_classifier.py"
+_SUBTYPE_TRAIN_SCRIPT = _PROJECT_ROOT / "ml" / "training" / "train_trash_subtype_classifier.py"
 
 _UPLOAD_ROOT = _PROJECT_ROOT / "ml" / "training" / "uploads"
 _RUNS_ROOT = _PROJECT_ROOT / "ml" / "training" / "runs" / "web_jobs"
@@ -38,14 +40,25 @@ _DATASET_REQUIRED_DIRS = (
     "labels/val",
 )
 
-# Scene classifier dataset: images/train/{WATER,SMOKE,NEGATIVE}/
-_SCENE_CLASSES = ("WATER", "SMOKE", "NEGATIVE")
+# Scene classifier dataset: images/train/{WATER,NEGATIVE}/
+_SCENE_CLASSES = ("WATER", "NEGATIVE")
 _SCENE_REQUIRED_SUBDIRS = tuple(f"images/train/{cls}" for cls in _SCENE_CLASSES)
 
-_VALID_CLASS_IDS = {0, 1, 2}
+_SUBTYPE_CLASSES = (
+    "CONSTRUCTION",
+    "ELECTRONIC",
+    "HAZARDOUS",
+    "HOUSEHOLD",
+    "MEDICAL",
+    "ORGANIC",
+    "RECYCLABLE",
+)
+_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
+
+_VALID_CLASS_IDS = {0, 1}
 
 # Target class mapping for the project
-_TARGET_CLASSES = {"TRASH": 0, "WATER": 1, "SMOKE": 2}
+_TARGET_CLASSES = {"TRASH": 0, "WATER": 1}
 
 
 def _utc_now_iso() -> str:
@@ -129,6 +142,37 @@ class TrainingJobStore:
             conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS scene_jobs (
+                  job_id TEXT PRIMARY KEY,
+                  created_at TEXT NOT NULL,
+                  updated_at TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  dataset_id TEXT NOT NULL,
+                  run_name TEXT NOT NULL,
+                  epochs INTEGER NOT NULL,
+                  batch INTEGER NOT NULL,
+                  lr REAL NOT NULL,
+                  data_root TEXT NOT NULL,
+                  output_path TEXT NOT NULL,
+                  stdout_log_path TEXT NOT NULL,
+                  result_json TEXT,
+                  error_text TEXT
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS subtype_datasets (
+                  dataset_id TEXT PRIMARY KEY,
+                  created_at TEXT NOT NULL,
+                  source_zip_path TEXT NOT NULL,
+                  extracted_dir TEXT NOT NULL,
+                  summary_json TEXT NOT NULL
+                )
+                """
+            )
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS subtype_jobs (
                   job_id TEXT PRIMARY KEY,
                   created_at TEXT NOT NULL,
                   updated_at TEXT NOT NULL,
@@ -412,11 +456,10 @@ def _prepare_training_data_yaml(dataset_dir: Path, target_yaml: Path) -> None:
         f"path: {dataset_dir.as_posix()}\n"
         "train: images/train\n"
         "val: images/val\n"
-        "nc: 3\n"
+        "nc: 2\n"
         "names:\n"
         "  0: TRASH\n"
         "  1: WATER\n"
-        "  2: SMOKE\n"
     )
     target_yaml.write_text(payload, encoding="utf-8")
 
@@ -978,7 +1021,7 @@ def inspect_dataset_zip(content: bytes) -> dict[str, Any]:
 def convert_dataset_zip(content: bytes, mapping: dict[str, str]) -> bytes:
     """Remap class IDs in all label .txt files inside the ZIP.
 
-    mapping: source class name (or str int) -> target class name (TRASH/WATER/SMOKE)
+    mapping: source class name (or str int) -> target class name (TRASH/WATER)
     Classes mapped to None / not in mapping are DROPPED (lines removed).
     Returns new ZIP bytes with remapped labels and updated data.yaml.
     """
@@ -1052,8 +1095,8 @@ def convert_dataset_zip(content: bytes, mapping: dict[str, str]) -> bytes:
 
 
 def _rewrite_yaml_names(yaml_text: str) -> str:
-    """Replace the names block in a YOLO yaml with the 3 target classes."""
-    new_names_block = "names:\n" "  0: TRASH\n" "  1: WATER\n" "  2: SMOKE\n"
+    """Replace the names block in a YOLO yaml with the 2 target classes."""
+    new_names_block = "names:\n" "  0: TRASH\n" "  1: WATER\n"
     lines = yaml_text.splitlines(keepends=True)
     out: list[str] = []
     skip = False
@@ -1077,8 +1120,12 @@ def _rewrite_yaml_names(yaml_text: str) -> str:
     return "".join(out)
 
 
-def restructure_dataset_zip(content: bytes, val_fraction: float = 0.15) -> bytes:
-    """Convert a flat train+labels ZIP to images/train,val + labels/train,val YOLO layout.
+def restructure_dataset_zip(
+    content: bytes,
+    val_fraction: float = 0.15,
+    test_fraction: float = 0.15,
+) -> bytes:
+    """Convert a flat train+labels ZIP to images/train,val,test + labels/train,val,test YOLO layout.
 
     Accepted input layouts (auto-detected):
       A)  train/<img>  +  labels/<img_stem>.txt
@@ -1087,9 +1134,11 @@ def restructure_dataset_zip(content: bytes, val_fraction: float = 0.15) -> bytes
       D)  <img> at root + labels/<img_stem>.txt
 
     Output always:
-      images/train/  images/val/  labels/train/  labels/val/
+      images/train/  images/val/  images/test/
+      labels/train/  labels/val/  labels/test/
     Labels are normalised (OBB→AABB, coords clamped).
-    val_fraction of images are randomly assigned to val (seed stable per zip).
+    Split ratio: train=(1-val_fraction-test_fraction), val=val_fraction, test=test_fraction.
+    Seed is stable per zip content.
     """
     import random as _rnd
 
@@ -1122,20 +1171,37 @@ def restructure_dataset_zip(content: bytes, val_fraction: float = 0.15) -> bytes
     if not img_entries:
         raise ValueError("No image files found in ZIP (jpg/png/bmp/webp/tiff).")
 
-    # ---- train/val split ----
+    # ---- train/val/test split (70/15/15 default) ----
     stems = sorted(img_entries.keys())
     _rnd.seed(42)
     _rnd.shuffle(stems)
-    n_val = max(1, int(len(stems) * val_fraction))
-    val_stems = set(stems[:n_val])
+    n = len(stems)
+    n_test = max(1, int(n * test_fraction))
+    n_val = max(1, int(n * val_fraction))
+    test_stems = set(stems[:n_test])
+    val_stems = set(stems[n_test : n_test + n_val])
+    # remainder → train
 
     # ---- build output ZIP ----
     out_buf = io.BytesIO()
-    stats = {"train_images": 0, "val_images": 0, "train_labels": 0, "val_labels": 0, "no_label": 0}
+    stats = {
+        "train_images": 0,
+        "val_images": 0,
+        "test_images": 0,
+        "train_labels": 0,
+        "val_labels": 0,
+        "test_labels": 0,
+        "no_label": 0,
+    }
 
     with zipfile.ZipFile(out_buf, "w", compression=zipfile.ZIP_DEFLATED) as dst:
         for stem in stems:
-            split = "val" if stem in val_stems else "train"
+            if stem in test_stems:
+                split = "test"
+            elif stem in val_stems:
+                split = "val"
+            else:
+                split = "train"
             orig_path = img_path_map[stem]
             ext = Path(orig_path).suffix.lower()
             img_bytes = img_entries[stem]
@@ -1146,7 +1212,6 @@ def restructure_dataset_zip(content: bytes, val_fraction: float = 0.15) -> bytes
             raw_label = label_entries.get(stem)
             if raw_label is None:
                 stats["no_label"] += 1
-                # write empty label file so YOLO doesn't complain
                 dst.writestr(f"labels/{split}/{stem}.txt", b"")
                 continue
 
@@ -1166,16 +1231,15 @@ def restructure_dataset_zip(content: bytes, val_fraction: float = 0.15) -> bytes
             )
             stats[f"{split}_labels"] += 1
 
-        # Write a minimal data.yaml so our inspect endpoint works on it later
         yaml_content = (
             "path: .\n"
             "train: images/train\n"
             "val: images/val\n"
-            "nc: 3\n"
+            "test: images/test\n"
+            "nc: 2\n"
             "names:\n"
             "  0: TRASH\n"
             "  1: WATER\n"
-            "  2: SMOKE\n"
         )
         dst.writestr("data.yaml", yaml_content.encode())
 
@@ -1491,7 +1555,7 @@ def get_training_orchestrator() -> TrainingOrchestrator:
 
 
 def _locate_scene_dataset_root(extracted: Path) -> Path:
-    """Find the directory that contains images/train/{WATER,SMOKE,NEGATIVE}."""
+    """Find the directory that contains images/train/{WATER,NEGATIVE}."""
     # Direct match
     if all((extracted / rel).is_dir() for rel in _SCENE_REQUIRED_SUBDIRS):
         return extracted
@@ -1517,7 +1581,7 @@ def _locate_scene_dataset_root(extracted: Path) -> Path:
     if direct_train.is_dir() and any((direct_train / cls).is_dir() for cls in _SCENE_CLASSES):
         return extracted
     raise ValueError(
-        "Scene dataset zip must contain images/train/{WATER,SMOKE,NEGATIVE}/ folder structure. "
+        "Scene dataset zip must contain images/train/{WATER,NEGATIVE}/ folder structure. "
         "At least one class folder is required."
     )
 
@@ -1950,139 +2014,147 @@ def _obb_line_to_aabb(parts: list[str]) -> list[str] | None:
 
 def merge_zips_direct(
     slots: list[tuple[bytes, str]],
+    *,
+    val_fraction: float = 0.15,
+    test_fraction: float = 0.15,
+    seed: int = 42,
 ) -> tuple[bytes, dict[str, Any]]:
-    """Nhận tối đa 3 cặp (zip_bytes, target_class) và gộp thành 1 ZIP duy nhất.
+    """Nhận danh sách (zip_bytes, target_class) và gộp thành 1 ZIP duy nhất.
 
-    target_class phải là "TRASH" | "WATER" | "SMOKE".
+    target_class phải là "TRASH" | "WATER".
     Mỗi slot được force-remap toàn bộ class_id về đúng target.
+    Toàn bộ ảnh được collect rồi RE-SPLIT 70/15/15 (train/val/test) với seed=42,
+    bất kể split có sẵn trong ZIP gốc.
     Trả về (merged_zip_bytes, stats).
-
-    stats keys:
-      slots: list of {target_class, images, labels, sample_labels}
-      total_images, total_labels
-      class_counts: {"0": n_trash, "1": n_water, "2": n_smoke}
-      data_yaml: str (nội dung data.yaml được nhúng vào ZIP)
     """
-    image_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
-    valid_targets = {"TRASH": 0, "WATER": 1, "SMOKE": 2}
+    import random as _rnd
 
-    # ── output buffers ──────────────────────────────────────────────────────
-    # Gộp vào cấu trúc YOLO chuẩn: images/train/, images/val/, labels/train/, labels/val/
-    # Ảnh và label được prefix ds{i}_ để tránh trùng tên.
-    out_entries: dict[str, bytes] = {}  # zip_path -> bytes
+    image_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
+    valid_targets = {"TRASH": 0, "WATER": 1}
+
+    # Collect tất cả items trước khi split:
+    # all_items: list of (unique_stem, img_ext, img_bytes, label_bytes | None, class_id)
+    all_items: list[tuple[str, str, bytes, bytes | None, int]] = []
     stats_slots: list[dict[str, Any]] = []
-    class_counts: dict[int, int] = {0: 0, 1: 0, 2: 0}
-    total_images = 0
-    total_labels = 0
+    class_counts: dict[int, int] = {0: 0, 1: 0}
 
     for slot_idx, (zip_bytes, target_class) in enumerate(slots):
         target_class = target_class.strip().upper()
         if target_class not in valid_targets:
             raise ValueError(
-                f"Slot {slot_idx}: target_class phải là TRASH/WATER/SMOKE, nhận '{target_class}'"
+                f"Slot {slot_idx}: target_class phải là TRASH/WATER, nhận '{target_class}'"
             )
         new_class_id = valid_targets[target_class]
         prefix = f"ds{slot_idx:02d}_"
 
         slot_images = 0
-        slot_labels = 0
-        sample_labels: list[str] = []  # preview vài dòng đầu
+        sample_labels: list[str] = []
 
         with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
             all_names = zf.namelist()
 
-            # ── locate images & labels inside zip ──────────────────────────
-            # Hỗ trợ cả flat (tên file trực tiếp) lẫn chuẩn (images/train/...)
-            img_map: dict[str, tuple[str, str]] = {}  # stem -> (zip_path, split)
-            lbl_map: dict[str, tuple[str, str]] = {}  # stem -> (zip_path, split)
+            # Collect image & label bytes (ignore existing split)
+            img_map: dict[str, tuple[str, bytes]] = {}  # stem -> (ext, bytes)
+            lbl_raw: dict[str, bytes] = {}  # stem -> raw txt bytes
 
             for name in all_names:
                 if name.startswith("__MACOSX") or name.endswith("/"):
                     continue
                 p = Path(name)
-                # Determine split from path segments
-                parts_lower = [seg.lower() for seg in p.parts]
-                split = "val" if "val" in parts_lower else "train"
-
                 if p.suffix.lower() in image_exts:
-                    img_map[p.stem] = (name, split)
+                    img_map[p.stem] = (p.suffix.lower(), zf.read(name))
                 elif p.suffix.lower() == ".txt" and p.name not in (
                     "requirements.txt",
                     "README.txt",
                 ):
-                    lbl_map[p.stem] = (name, split)
+                    lbl_raw[p.stem] = zf.read(name)
 
-            # ── copy images ────────────────────────────────────────────────
-            for stem, (zip_path, split) in img_map.items():
-                ext = Path(zip_path).suffix
-                dst_path = f"images/{split}/{prefix}{stem}{ext}"
-                out_entries[dst_path] = zf.read(zip_path)
+            for stem, (ext, img_bytes) in img_map.items():
+                raw_label = lbl_raw.get(stem)
+                remapped: bytes | None = None
+
+                if raw_label is not None:
+                    lines_out: list[str] = []
+                    for line in raw_label.decode("utf-8", errors="replace").splitlines():
+                        line = line.strip()
+                        if not line:
+                            continue
+                        parts = line.split()
+                        if len(parts) < 5:
+                            continue
+                        if len(parts) >= 9:
+                            converted = _obb_line_to_aabb(parts)
+                            if converted is None:
+                                continue
+                            parts = converted
+                        elif len(parts) > 5:
+                            parts = parts[:5]
+                        parts[0] = str(new_class_id)
+                        lines_out.append(" ".join(parts))
+                        class_counts[new_class_id] += 1
+                        if len(sample_labels) < 3:
+                            sample_labels.append(" ".join(parts))
+                    if lines_out:
+                        remapped = ("\n".join(lines_out) + "\n").encode()
+
+                unique_stem = f"{prefix}{stem}"
+                all_items.append((unique_stem, ext, img_bytes, remapped, new_class_id))
                 slot_images += 1
 
-            # ── remap & copy labels (auto OBB→AABB) ───────────────────────
-            for stem, (zip_path, split) in lbl_map.items():
-                raw_txt = zf.read(zip_path).decode("utf-8", errors="replace")
-                remapped_lines: list[str] = []
-                for line in raw_txt.splitlines():
-                    line = line.strip()
-                    if not line:
-                        continue
-                    parts = line.split()
-                    if len(parts) < 5:
-                        continue
-                    # Auto-convert OBB (9 cols) → AABB (5 cols)
-                    if len(parts) >= 9:
-                        converted = _obb_line_to_aabb(parts)
-                        if converted is None:
-                            continue
-                        parts = converted
-                    elif len(parts) > 5:
-                        parts = parts[:5]  # trim extra columns
-                    # Force-replace class_id → target
-                    parts[0] = str(new_class_id)
-                    remapped_lines.append(" ".join(parts))
-                    class_counts[new_class_id] += 1
-
-                if not remapped_lines:
-                    continue
-
-                dst_path = f"labels/{split}/{prefix}{stem}.txt"
-                out_entries[dst_path] = ("\n".join(remapped_lines) + "\n").encode()
-                slot_labels += 1
-
-                # Lấy sample label để preview UI (tối đa 3 dòng đầu của slot)
-                if len(sample_labels) < 3:
-                    sample_labels.extend(remapped_lines[:2])
-
-        total_images += slot_images
-        total_labels += slot_labels
         stats_slots.append(
             {
                 "target_class": target_class,
                 "class_id": new_class_id,
                 "images": slot_images,
-                "labels": slot_labels,
                 "sample_labels": sample_labels[:3],
             }
         )
 
-    if total_images == 0:
+    if not all_items:
         raise ValueError("Không tìm thấy ảnh nào trong các ZIP đã upload.")
 
-    # ── Tạo data.yaml chuẩn 3 class ────────────────────────────────────────
+    # ── Re-split 70/15/15 (seed=42) ────────────────────────────────────────
+    stems = [item[0] for item in all_items]
+    _rnd.seed(seed)
+    shuffled = list(range(len(stems)))
+    _rnd.shuffle(shuffled)
+
+    n = len(shuffled)
+    n_test = max(1, int(n * test_fraction))
+    n_val = max(1, int(n * val_fraction))
+    test_idx = set(shuffled[:n_test])
+    val_idx = set(shuffled[n_test : n_test + n_val])
+
+    split_counts = {"train": 0, "val": 0, "test": 0}
+    out_entries: dict[str, bytes] = {}
+
+    for i, (unique_stem, ext, img_bytes, label_bytes, _cls_id) in enumerate(all_items):
+        if i in test_idx:
+            split = "test"
+        elif i in val_idx:
+            split = "val"
+        else:
+            split = "train"
+
+        out_entries[f"images/{split}/{unique_stem}{ext}"] = img_bytes
+        if label_bytes is not None:
+            out_entries[f"labels/{split}/{unique_stem}.txt"] = label_bytes
+        else:
+            out_entries[f"labels/{split}/{unique_stem}.txt"] = b""
+        split_counts[split] += 1
+
     data_yaml = (
         "path: .\n"
         "train: images/train\n"
         "val: images/val\n"
-        "nc: 3\n"
+        "test: images/test\n"
+        "nc: 2\n"
         "names:\n"
         "  0: TRASH\n"
         "  1: WATER\n"
-        "  2: SMOKE\n"
     )
     out_entries["data.yaml"] = data_yaml.encode()
 
-    # ── Pack into output ZIP ────────────────────────────────────────────────
     out_buf = io.BytesIO()
     with zipfile.ZipFile(out_buf, "w", compression=zipfile.ZIP_DEFLATED) as dst:
         for path, data in out_entries.items():
@@ -2090,9 +2162,629 @@ def merge_zips_direct(
 
     stats = {
         "slots": stats_slots,
-        "total_images": total_images,
-        "total_labels": total_labels,
+        "total_images": len(all_items),
+        "train_images": split_counts["train"],
+        "val_images": split_counts["val"],
+        "test_images": split_counts["test"],
         "class_counts": {str(k): v for k, v in class_counts.items()},
         "data_yaml": data_yaml,
     }
     return out_buf.getvalue(), stats
+
+
+# ---------------------------------------------------------------------------
+# Trash subtype — merge ZIPs (ImageFolder) + training orchestrator
+# ---------------------------------------------------------------------------
+
+
+def _normalize_subtype_class(name: str) -> str | None:
+    key = name.strip().upper().replace(" ", "_").replace("-", "_")
+    if key in _SUBTYPE_CLASSES:
+        return key
+    aliases = {
+        "PLASTIC": "RECYCLABLE",
+        "GLASS": "RECYCLABLE",
+        "METAL": "RECYCLABLE",
+        "PAPER": "RECYCLABLE",
+        "CARDBOARD": "RECYCLABLE",
+        "BOTTLE": "RECYCLABLE",
+        "CAN": "RECYCLABLE",
+        "BAG": "HOUSEHOLD",
+        "PLASTIC_BAG": "HOUSEHOLD",
+        "CLOTHES": "HOUSEHOLD",
+        "TEXTILE": "HOUSEHOLD",
+        "GARBAGE_BAG": "HOUSEHOLD",
+        "MASK": "MEDICAL",
+        "SYRINGE": "MEDICAL",
+        "GLOVE": "MEDICAL",
+        "BIO": "ORGANIC",
+        "FOOD": "ORGANIC",
+        "BATTERY": "HAZARDOUS",
+        "CHEMICAL": "HAZARDOUS",
+        "BRICK": "CONSTRUCTION",
+        "CEMENT": "CONSTRUCTION",
+        "PHONE": "ELECTRONIC",
+        "LAPTOP": "ELECTRONIC",
+        "CABLE": "ELECTRONIC",
+    }
+    return aliases.get(key)
+
+
+def _collect_images_from_subtype_zip(
+    zip_bytes: bytes, target_class: str
+) -> list[tuple[bytes, str]]:
+    """Extract image bytes from a zip; assign target_class unless path hints another subtype."""
+    target_class = target_class.strip().upper()
+    if target_class not in _SUBTYPE_CLASSES:
+        raise ValueError(
+            f"target_class phải là một trong {', '.join(_SUBTYPE_CLASSES)}, nhận '{target_class}'."
+        )
+
+    found: list[tuple[bytes, str]] = []
+    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+        for name in zf.namelist():
+            if name.startswith("__MACOSX") or name.endswith("/"):
+                continue
+            p = Path(name)
+            if p.suffix.lower() not in _IMAGE_EXTS:
+                continue
+            inferred = None
+            for seg in p.parts:
+                inferred = _normalize_subtype_class(seg)
+                if inferred:
+                    break
+            cls = inferred or target_class
+            found.append((zf.read(name), cls))
+    return found
+
+
+def merge_subtype_zips_direct(
+    slots: list[tuple[bytes, str]],
+    *,
+    val_fraction: float = 0.15,
+    test_fraction: float = 0.15,
+    seed: int = 42,
+) -> tuple[bytes, dict[str, Any]]:
+    """Gộp nhiều ZIP (mỗi ZIP gán 1 class) → 1 ZIP ImageFolder train/val/test, không cần .txt.
+
+    Output layout:
+      images/train/{CONSTRUCTION,ELECTRONIC,...}/
+      images/val/{...}/
+      images/test/{...}/
+      dataset_info.json
+    Split ratio: train=(1-val_fraction-test_fraction), val=val_fraction, test=test_fraction.
+    """
+    if not slots:
+        raise ValueError("Cần ít nhất 1 ZIP để gộp.")
+    if not 0.05 <= val_fraction <= 0.4:
+        raise ValueError("val_fraction phải trong khoảng 0.05–0.40.")
+    if not 0.05 <= test_fraction <= 0.4:
+        raise ValueError("test_fraction phải trong khoảng 0.05–0.40.")
+    if val_fraction + test_fraction >= 0.9:
+        raise ValueError("val_fraction + test_fraction phải nhỏ hơn 0.90.")
+
+    pools: dict[str, list[tuple[bytes, str, int, int]]] = {cls: [] for cls in _SUBTYPE_CLASSES}
+    stats_slots: list[dict[str, Any]] = []
+
+    for slot_idx, (zip_bytes, target_class) in enumerate(slots):
+        target_class = target_class.strip().upper()
+        images = _collect_images_from_subtype_zip(zip_bytes, target_class)
+        if not images:
+            stats_slots.append({"target_class": target_class, "images": 0, "assigned_classes": {}})
+            continue
+
+        assigned: dict[str, int] = {}
+        prefix = f"ds{slot_idx:02d}_"
+        for img_idx, (data, cls) in enumerate(images):
+            fname = f"{prefix}{img_idx:05d}.jpg"
+            pools[cls].append((data, fname, slot_idx, img_idx))
+            assigned[cls] = assigned.get(cls, 0) + 1
+
+        stats_slots.append(
+            {
+                "target_class": target_class,
+                "images": len(images),
+                "assigned_classes": assigned,
+            }
+        )
+
+    rng = random.Random(seed)
+    out_entries: dict[str, bytes] = {}
+    train_counts: dict[str, int] = {cls: 0 for cls in _SUBTYPE_CLASSES}
+    val_counts: dict[str, int] = {cls: 0 for cls in _SUBTYPE_CLASSES}
+    test_counts: dict[str, int] = {cls: 0 for cls in _SUBTYPE_CLASSES}
+
+    for cls, items in pools.items():
+        if not items:
+            continue
+        rng.shuffle(items)
+        n = len(items)
+        n_test = max(1, int(n * test_fraction)) if n >= 3 else 0
+        n_val = max(1, int(n * val_fraction)) if n >= 2 else 0
+        test_items = items[:n_test]
+        val_items = items[n_test : n_test + n_val]
+        train_items = items[n_test + n_val :]
+
+        for split_name, split_items, counter in (
+            ("train", train_items, train_counts),
+            ("val", val_items, val_counts),
+            ("test", test_items, test_counts),
+        ):
+            for data, fname, _slot, _idx in split_items:
+                path = f"images/{split_name}/{cls}/{fname}"
+                out_entries[path] = data
+                counter[cls] += 1
+
+    total_train = sum(train_counts.values())
+    total_val = sum(val_counts.values())
+    total_test = sum(test_counts.values())
+    if total_train == 0:
+        raise ValueError("Không tìm thấy ảnh nào trong các ZIP đã upload.")
+
+    info = {
+        "format": "trash_subtype_imagefolder",
+        "classes": list(_SUBTYPE_CLASSES),
+        "val_fraction": val_fraction,
+        "test_fraction": test_fraction,
+        "seed": seed,
+        "train_counts": train_counts,
+        "val_counts": val_counts,
+        "test_counts": test_counts,
+        "total_train": total_train,
+        "total_val": total_val,
+        "total_test": total_test,
+    }
+    out_entries["dataset_info.json"] = json.dumps(info, indent=2, ensure_ascii=True).encode()
+
+    out_buf = io.BytesIO()
+    with zipfile.ZipFile(out_buf, "w", compression=zipfile.ZIP_DEFLATED) as dst:
+        for path, data in sorted(out_entries.items()):
+            dst.writestr(path, data)
+
+    stats = {
+        "slots": stats_slots,
+        "total_train": total_train,
+        "total_val": total_val,
+        "total_test": total_test,
+        "train_class_counts": train_counts,
+        "val_class_counts": val_counts,
+        "test_class_counts": test_counts,
+        "val_fraction": val_fraction,
+        "test_fraction": test_fraction,
+        "dataset_info": info,
+    }
+    return out_buf.getvalue(), stats
+
+
+def _locate_subtype_dataset_root(extracted: Path) -> Path:
+    train_root = extracted / "images" / "train"
+    if train_root.is_dir() and any((train_root / cls).is_dir() for cls in _SUBTYPE_CLASSES):
+        return extracted
+    nested = [
+        child
+        for child in extracted.iterdir()
+        if child.is_dir()
+        and (child / "images" / "train").is_dir()
+        and any((child / "images" / "train" / cls).is_dir() for cls in _SUBTYPE_CLASSES)
+    ]
+    if len(nested) == 1:
+        return nested[0]
+    raise ValueError(
+        "Subtype dataset zip phải có images/train/{CONSTRUCTION,ELECTRONIC,HAZARDOUS,HOUSEHOLD,MEDICAL,ORGANIC,RECYCLABLE}/. "
+        "Dùng tab Gộp Subtype để tạo ZIP chuẩn."
+    )
+
+
+def _ingest_subtype_dataset_zip(filename: str, content: bytes) -> dict[str, Any]:
+    dataset_id = f"tds_{uuid.uuid4().hex[:10]}"
+    created_at = _utc_now_iso()
+
+    _UPLOAD_ROOT.mkdir(parents=True, exist_ok=True)
+    zip_path = _UPLOAD_ROOT / f"{dataset_id}_{Path(filename).name}"
+    zip_path.write_bytes(content)
+
+    extracted_dir = _UPLOAD_ROOT / f"{dataset_id}_raw"
+    if extracted_dir.exists():
+        shutil.rmtree(extracted_dir, ignore_errors=True)
+    extracted_dir.mkdir(parents=True, exist_ok=True)
+
+    _safe_extract_zip(zip_path, extracted_dir)
+    dataset_root = _locate_subtype_dataset_root(extracted_dir)
+
+    train_counts: dict[str, int] = {}
+    val_counts: dict[str, int] = {}
+    for cls in _SUBTYPE_CLASSES:
+        tdir = dataset_root / "images" / "train" / cls
+        vdir = dataset_root / "images" / "val" / cls
+        train_counts[cls] = len([f for f in tdir.iterdir() if f.is_file()]) if tdir.is_dir() else 0
+        val_counts[cls] = len([f for f in vdir.iterdir() if f.is_file()]) if vdir.is_dir() else 0
+
+    return {
+        "dataset_id": dataset_id,
+        "created_at": created_at,
+        "source_zip_path": str(zip_path.resolve()),
+        "extracted_dir": str(dataset_root.resolve()),
+        "summary": {
+            "total_train_images": sum(train_counts.values()),
+            "total_val_images": sum(val_counts.values()),
+            "train_class_counts": train_counts,
+            "val_class_counts": val_counts,
+            "classes": list(_SUBTYPE_CLASSES),
+            "dataset_root": str(dataset_root.resolve()),
+        },
+    }
+
+
+def _store_insert_subtype_dataset(store: TrainingJobStore, payload: dict[str, Any]) -> None:
+    with store._lock, store._conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO subtype_datasets (dataset_id, created_at, source_zip_path, extracted_dir, summary_json)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (
+                payload["dataset_id"],
+                payload["created_at"],
+                payload["source_zip_path"],
+                payload["extracted_dir"],
+                json.dumps(payload["summary"], ensure_ascii=True),
+            ),
+        )
+
+
+def _store_get_subtype_dataset(store: TrainingJobStore, dataset_id: str) -> sqlite3.Row | None:
+    with store._conn() as conn:
+        return conn.execute(
+            "SELECT * FROM subtype_datasets WHERE dataset_id = ?", (dataset_id,)
+        ).fetchone()
+
+
+def _store_insert_subtype_job(store: TrainingJobStore, payload: dict[str, Any]) -> None:
+    with store._lock, store._conn() as conn:
+        conn.execute(
+            """
+            INSERT INTO subtype_jobs (
+              job_id, created_at, updated_at, status, dataset_id, run_name,
+              epochs, batch, lr, data_root, output_path, stdout_log_path
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                payload["job_id"],
+                payload["created_at"],
+                payload["updated_at"],
+                payload["status"],
+                payload["dataset_id"],
+                payload["run_name"],
+                payload["epochs"],
+                payload["batch"],
+                payload["lr"],
+                payload["data_root"],
+                payload["output_path"],
+                payload["stdout_log_path"],
+            ),
+        )
+
+
+def _store_update_subtype_job(
+    store: TrainingJobStore,
+    job_id: str,
+    *,
+    status: str | None = None,
+    result: dict[str, Any] | None = None,
+    error_text: str | None = None,
+) -> None:
+    now = _utc_now_iso()
+    with store._lock, store._conn() as conn:
+        row = conn.execute("SELECT * FROM subtype_jobs WHERE job_id = ?", (job_id,)).fetchone()
+        if row is None:
+            return
+        conn.execute(
+            """
+            UPDATE subtype_jobs
+            SET updated_at = ?, status = COALESCE(?, status),
+                result_json = COALESCE(?, result_json), error_text = COALESCE(?, error_text)
+            WHERE job_id = ?
+            """,
+            (
+                now,
+                status,
+                json.dumps(result, ensure_ascii=True) if result is not None else None,
+                error_text,
+                job_id,
+            ),
+        )
+
+
+def _store_get_subtype_job(store: TrainingJobStore, job_id: str) -> sqlite3.Row | None:
+    with store._conn() as conn:
+        return conn.execute("SELECT * FROM subtype_jobs WHERE job_id = ?", (job_id,)).fetchone()
+
+
+def _store_count_subtype_jobs(store: TrainingJobStore) -> int:
+    with store._conn() as conn:
+        row = conn.execute("SELECT COUNT(*) AS n FROM subtype_jobs").fetchone()
+        return int(row["n"]) if row else 0
+
+
+def _store_list_subtype_jobs(
+    store: TrainingJobStore, *, limit: int, offset: int
+) -> list[sqlite3.Row]:
+    with store._conn() as conn:
+        return conn.execute(
+            "SELECT * FROM subtype_jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        ).fetchall()
+
+
+def _subtype_row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
+    result = None
+    if row["result_json"]:
+        result = json.loads(row["result_json"])
+    return {
+        "job_id": row["job_id"],
+        "status": row["status"],
+        "dataset_id": row["dataset_id"],
+        "run_name": row["run_name"],
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "epochs": row["epochs"],
+        "batch": row["batch"],
+        "lr": row["lr"],
+        "data_root": row["data_root"],
+        "output_path": row["output_path"],
+        "result": result,
+        "error_text": row["error_text"],
+    }
+
+
+class SubtypeTrainingOrchestrator:
+    """Runs trash subtype classifier fine-tuning jobs in background threads."""
+
+    def __init__(self) -> None:
+        self.store = TrainingJobStore()
+        self._logger = get_logger(__name__)
+        self._procs: dict[str, subprocess.Popen[str]] = {}
+        self._procs_lock = threading.Lock()
+
+    def upload_dataset(self, *, filename: str, content: bytes) -> dict[str, Any]:
+        payload = _ingest_subtype_dataset_zip(filename, content)
+        _store_insert_subtype_dataset(self.store, payload)
+        return payload
+
+    def ingest_merged_zip(self, *, filename: str, content: bytes) -> dict[str, Any]:
+        """Register merged ZIP for training without re-download."""
+        return self.upload_dataset(filename=filename, content=content)
+
+    def create_job(
+        self,
+        *,
+        dataset_id: str,
+        run_name: str,
+        epochs: int,
+        batch: int,
+        lr: float,
+        output_path: str | None,
+    ) -> dict[str, Any]:
+        row = _store_get_subtype_dataset(self.store, dataset_id)
+        if row is None:
+            raise ValueError("Unknown subtype dataset_id.")
+
+        job_id = f"tsj_{uuid.uuid4().hex[:10]}"
+        now = _utc_now_iso()
+        job_dir = _RUNS_ROOT / job_id
+        job_dir.mkdir(parents=True, exist_ok=True)
+
+        data_root = row["extracted_dir"]
+        resolved_output = output_path or str(
+            (_PROJECT_ROOT / "ml" / "weights" / "trash_subtype_classifier.pt").resolve()
+        )
+        log_path = job_dir / "train.log"
+
+        payload: dict[str, Any] = {
+            "job_id": job_id,
+            "created_at": now,
+            "updated_at": now,
+            "status": "QUEUED",
+            "dataset_id": dataset_id,
+            "run_name": run_name,
+            "epochs": epochs,
+            "batch": batch,
+            "lr": lr,
+            "data_root": data_root,
+            "output_path": resolved_output,
+            "stdout_log_path": str(log_path.resolve()),
+        }
+        _store_insert_subtype_job(self.store, payload)
+
+        thread = threading.Thread(
+            target=self._run_job,
+            args=(job_id, data_root, epochs, batch, lr, resolved_output),
+            daemon=True,
+        )
+        thread.start()
+        return payload
+
+    def _run_job(
+        self,
+        job_id: str,
+        data_root: str,
+        epochs: int,
+        batch: int,
+        lr: float,
+        output_path: str,
+    ) -> None:
+        row = _store_get_subtype_job(self.store, job_id)
+        if row is None:
+            return
+        log_path = Path(row["stdout_log_path"])
+        _store_update_subtype_job(self.store, job_id, status="RUNNING")
+        env = dict(**os.environ)
+        env["WANDB_MODE"] = "disabled"
+        env["PYTHONUNBUFFERED"] = "1"
+
+        cmd = [
+            "uv",
+            "run",
+            "python",
+            str(_SUBTYPE_TRAIN_SCRIPT.resolve()),
+            "--data-root",
+            data_root,
+            "--epochs",
+            str(epochs),
+            "--batch-size",
+            str(batch),
+            "--lr",
+            str(lr),
+            "--workers",
+            "0",
+            "--output",
+            output_path,
+        ]
+        self._logger.info("subtype_job_start", job_id=job_id, command=" ".join(cmd))
+        start_ts = time.time()
+        code = -1
+        try:
+            with log_path.open("w", encoding="utf-8") as logf:
+                proc = subprocess.Popen(  # noqa: S603
+                    cmd,
+                    cwd=str(_PROJECT_ROOT),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    bufsize=1,
+                    env=env,
+                )
+                with self._procs_lock:
+                    self._procs[job_id] = proc
+                try:
+                    assert proc.stdout is not None
+                    for line in proc.stdout:
+                        logf.write(line)
+                        logf.flush()
+                    code = proc.wait()
+                finally:
+                    with self._procs_lock:
+                        self._procs.pop(job_id, None)
+        except Exception as exc:  # noqa: BLE001
+            with self._procs_lock:
+                self._procs.pop(job_id, None)
+            with log_path.open("a", encoding="utf-8") as logf:
+                logf.write("\n[orchestrator_error] Subtype training crashed.\n")
+                logf.write(traceback.format_exc())
+            _store_update_subtype_job(
+                self.store,
+                job_id,
+                status="FAILED",
+                error_text=f"{type(exc).__name__}: {exc}",
+            )
+            return
+
+        row_after = _store_get_subtype_job(self.store, job_id)
+        if row_after is not None and row_after["status"] == "FAILED":
+            err = row_after["error_text"] or ""
+            if "Cancelled" in err:
+                return
+
+        duration = round(time.time() - start_ts, 2)
+        result_payload: dict[str, Any] = {
+            "exit_code": code,
+            "duration_seconds": duration,
+            "output_path": output_path,
+        }
+        if code == 0:
+            _store_update_subtype_job(self.store, job_id, status="SUCCEEDED", result=result_payload)
+            self._logger.info("subtype_job_success", job_id=job_id, duration=duration)
+        else:
+            _store_update_subtype_job(
+                self.store,
+                job_id,
+                status="FAILED",
+                result=result_payload,
+                error_text=f"Training failed with exit code {code}",
+            )
+            self._logger.warning("subtype_job_failed", job_id=job_id, exit_code=code)
+
+    def list_jobs(self, *, limit: int = 20, offset: int = 0) -> dict[str, Any]:
+        rows = _store_list_subtype_jobs(self.store, limit=limit, offset=offset)
+        total = _store_count_subtype_jobs(self.store)
+        dataset_cache: dict[str, Any] = {}
+        items: list[dict[str, Any]] = []
+        for row in rows:
+            payload = _subtype_row_to_dict(row)
+            ds_id = payload.get("dataset_id")
+            if ds_id and ds_id not in dataset_cache:
+                ds_row = _store_get_subtype_dataset(self.store, ds_id)
+                if ds_row and ds_row["summary_json"]:
+                    dataset_cache[ds_id] = json.loads(ds_row["summary_json"])
+                else:
+                    dataset_cache[ds_id] = None
+            if ds_id:
+                payload["dataset_summary"] = dataset_cache.get(ds_id)
+            items.append(payload)
+        return {"items": items, "total": total, "limit": limit, "offset": offset}
+
+    def get_job(self, job_id: str) -> dict[str, Any]:
+        row = _store_get_subtype_job(self.store, job_id)
+        if row is None:
+            raise ValueError("Unknown subtype job_id.")
+        payload = _subtype_row_to_dict(row)
+        log_path = Path(row["stdout_log_path"])
+        if log_path.is_file():
+            payload["log_size_bytes"] = log_path.stat().st_size
+        ds_row = _store_get_subtype_dataset(self.store, row["dataset_id"])
+        if ds_row and ds_row["summary_json"]:
+            payload["dataset_summary"] = json.loads(ds_row["summary_json"])
+        return payload
+
+    def read_log(self, job_id: str, *, offset: int = 0, limit: int = 20000) -> dict[str, Any]:
+        row = _store_get_subtype_job(self.store, job_id)
+        if row is None:
+            raise ValueError("Unknown subtype job_id.")
+        log_path = Path(row["stdout_log_path"])
+        if not log_path.is_file():
+            return {"content": "", "next_offset": 0, "eof": True}
+        blob = log_path.read_text(encoding="utf-8", errors="replace")
+        start = max(offset, 0)
+        end = min(start + max(limit, 1), len(blob))
+        chunk = blob[start:end]
+        return {
+            "content": chunk,
+            "next_offset": end,
+            "eof": end >= len(blob),
+            "total_size": len(blob),
+            "status": row["status"],
+        }
+
+    def kill_job(self, job_id: str) -> dict[str, Any]:
+        """Terminate a running subtype training process."""
+        row = _store_get_subtype_job(self.store, job_id)
+        if row is None:
+            raise ValueError("Unknown subtype job_id.")
+        if row["status"] not in ("RUNNING", "QUEUED"):
+            raise ValueError(f"Job is not running (status={row['status']}).")
+        with self._procs_lock:
+            proc = self._procs.get(job_id)
+        if proc is not None:
+            with contextlib.suppress(Exception):
+                proc.kill()
+            with self._procs_lock:
+                self._procs.pop(job_id, None)
+        _store_update_subtype_job(
+            self.store,
+            job_id,
+            status="FAILED",
+            error_text="Cancelled by user.",
+        )
+        return self.get_job(job_id)
+
+
+_SUBTYPE_ORCHESTRATOR: SubtypeTrainingOrchestrator | None = None
+
+
+def get_subtype_training_orchestrator() -> SubtypeTrainingOrchestrator:
+    global _SUBTYPE_ORCHESTRATOR
+    if _SUBTYPE_ORCHESTRATOR is None:
+        _SUBTYPE_ORCHESTRATOR = SubtypeTrainingOrchestrator()
+    return _SUBTYPE_ORCHESTRATOR

@@ -1,4 +1,4 @@
-"""EfficientNet-B0 scene classifier for WATER and SMOKE pollution."""
+"""EfficientNet-B0 scene classifier for WATER pollution."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ try:
 except ImportError:  # pragma: no cover
     _TORCH_AVAILABLE = False
 
-_SCENE_CLASSES = ("WATER", "SMOKE", "NEGATIVE")
+_SCENE_CLASSES = ("WATER", "NEGATIVE")
 
 _INFERENCE_TRANSFORM = None
 
@@ -47,14 +47,14 @@ def _build_efficientnet_b0(num_classes: int) -> Any:
 
 
 class ScenePollutionClassifier:
-    """Lazy-load fine-tuned EfficientNet-B0; returns WATER/SMOKE probabilities."""
+    """Lazy-load fine-tuned EfficientNet-B0; returns WATER probability."""
 
     __slots__ = ("_attempted_load", "_class_to_idx", "_model", "_settings")
 
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
         self._model: Any | None = None
-        self._class_to_idx: dict[str, int] = {"WATER": 0, "SMOKE": 1, "NEGATIVE": 2}
+        self._class_to_idx: dict[str, int] = {"WATER": 0, "NEGATIVE": 1}
         self._attempted_load = False
 
     def is_loaded(self) -> bool:
@@ -90,10 +90,10 @@ class ScenePollutionClassifier:
         return m
 
     def predict_proba(self, image_bytes: bytes) -> dict[str, float]:
-        """Return {WATER: float, SMOKE: float}. Returns zeros if model not loaded."""
+        """Return {WATER: float}. Returns zero if model not loaded."""
         model = self._ensure_model()
         if model is None:
-            return {"WATER": 0.0, "SMOKE": 0.0}
+            return {"WATER": 0.0}
 
         transform = _get_transform()
         with Image.open(io.BytesIO(image_bytes)) as pil_img:
@@ -106,7 +106,7 @@ class ScenePollutionClassifier:
             probs = torch.softmax(logits, dim=1)[0]
 
         idx_to_class = {v: k for k, v in self._class_to_idx.items()}
-        result = {"WATER": 0.0, "SMOKE": 0.0}
+        result = {"WATER": 0.0}
         for idx, prob in enumerate(probs.tolist()):
             cls = idx_to_class.get(idx, "")
             if cls in result:

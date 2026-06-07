@@ -749,14 +749,14 @@
       <p class="card-head-sub">Kéo thả ảnh hoặc chụp trực tiếp — ảnh chỉ xử lý trên trình duyệt của bạn khi gọi API.</p>
       <div class="step1-grid">
         <div class="file-zone" id="fileZone" aria-label="Kéo thả hoặc chọn ảnh">
-          <input id="fileInput" type="file" accept="image/*" capture="environment" />
+          <input id="fileInput" type="file" accept="image/*,.heic,.heif" capture="environment" />
           <div class="file-zone-ui" aria-hidden="true">
             <div class="fz-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
             </div>
             <strong>Thả ảnh vào đây</strong>
             <span class="fz-hint">hoặc nhấn để chọn từ máy / máy ảnh điện thoại</span>
-            <span class="fz-formats">JPG · PNG · WebP · HEIC (tuỳ trình duyệt)</span>
+            <span class="fz-formats">JPG · PNG · WebP · HEIC (tự chuyển JPG để xem trước)</span>
           </div>
         </div>
         <div class="preview-panel">
@@ -815,6 +815,7 @@
       var fileZone = document.getElementById("fileZone");
       var preview = document.getElementById("preview");
       var previewFrame = document.getElementById("previewFrame");
+      var previewPlaceholder = document.getElementById("previewPlaceholder");
       var canvas = document.getElementById("detectionCanvas");
       var ctx = canvas.getContext("2d");
       var analyzeBtn = document.getElementById("analyzeBtn");
@@ -827,7 +828,65 @@
       var lastPayload = null;
       var noiseSupported = false;
       var lastPreviewUrl = null;
+      var pendingUploadFile = null;
       var dragDepth = 0;
+
+      function parseApiError(res) {
+        return res.text().then(function (text) {
+          try {
+            var j = JSON.parse(text);
+            var d = j && j.detail;
+            if (typeof d === "string") return d;
+            if (Array.isArray(d) && d.length) return d.map(function (x) { return x.msg || x; }).join("; ");
+            if (d) return JSON.stringify(d);
+          } catch (e) { /* not JSON */ }
+          return (text && text.trim()) || res.statusText || "Lỗi " + res.status;
+        });
+      }
+
+      function isHeicFile(file) {
+        if (!file) return false;
+        var name = (file.name || "").toLowerCase();
+        var t = (file.type || "").toLowerCase();
+        return (
+          name.endsWith(".heic") ||
+          name.endsWith(".heif") ||
+          t === "image/heic" ||
+          t === "image/heif" ||
+          t === "image/heif-sequence"
+        );
+      }
+
+      function prepareImageFile(rawFile) {
+        if (!isHeicFile(rawFile)) {
+          return Promise.resolve(rawFile);
+        }
+        var fd = new FormData();
+        fd.append("image", rawFile, rawFile.name || "photo.heic");
+        return fetch("/api/v1/images/normalize", { method: "POST", body: fd })
+          .then(function (res) {
+            if (!res.ok) {
+              return parseApiError(res).then(function (msg) {
+                throw new Error(msg || "Chuyển HEIC thất bại.");
+              });
+            }
+            return res.blob();
+          })
+          .then(function (blob) {
+            var base = (rawFile.name || "photo").replace(/\.(heic|heif)$/i, "");
+            return new File([blob], base + ".jpg", {
+              type: "image/jpeg",
+              lastModified: rawFile.lastModified,
+            });
+          });
+      }
+
+      function showPreviewPlaceholder(msg) {
+        if (!previewPlaceholder) return;
+        previewPlaceholder.style.display = "";
+        while (previewPlaceholder.firstChild) previewPlaceholder.removeChild(previewPlaceholder.firstChild);
+        previewPlaceholder.appendChild(document.createTextNode(msg));
+      }
 
       // Màu cho từng loại ô nhiễm (border, fill với alpha)
       var CLASS_COLORS = {
@@ -838,8 +897,73 @@
       };
       var DEFAULT_COLOR = { stroke: "#10b981", fill: "rgba(16,185,129,0.12)", label: "#047857" };
 
+      var SUBTYPE_VI = {
+        HOUSEHOLD: "Sinh hoạt",
+        RECYCLABLE: "Tái chế",
+        ORGANIC: "Hữu cơ",
+        MEDICAL: "Y tế",
+        ELECTRONIC: "Điện tử",
+        CONSTRUCTION: "Xây dựng",
+        HAZARDOUS: "Nguy hại",
+        UNKNOWN: "Chưa rõ",
+      };
+
+      var SUBTYPE_TAG_COLORS = {
+        HOUSEHOLD: "#b45309",
+        RECYCLABLE: "#047857",
+        ORGANIC: "#15803d",
+        MEDICAL: "#be123c",
+        ELECTRONIC: "#6d28d9",
+        CONSTRUCTION: "#57534e",
+        HAZARDOUS: "#c2410c",
+        UNKNOWN: "#64748b",
+      };
+
+      var lastDrawPredictions = null;
+
       function getColor(cls) {
         return CLASS_COLORS[cls] || DEFAULT_COLOR;
+      }
+
+      function formatSubtypeLine(subtype, subtypeConf) {
+        if (!subtype || subtype === "UNKNOWN") return null;
+        var vi = SUBTYPE_VI[subtype] || subtype;
+        if (subtypeConf != null && !isNaN(subtypeConf)) {
+          return vi + " " + Math.round(Number(subtypeConf) * 100) + "%";
+        }
+        return vi;
+      }
+
+      function drawTag(ctx, x, y, lines, bgColor, fontSize) {
+        var padX = 6;
+        var padY = 4;
+        var lineH = fontSize + 4;
+        var maxW = 0;
+        lines.forEach(function (line) {
+          var w = ctx.measureText(line).width;
+          if (w > maxW) maxW = w;
+        });
+        var tagW = maxW + padX * 2;
+        var tagH = lines.length * lineH + padY * 2;
+        var r = 4;
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + tagW - r, y);
+        ctx.quadraticCurveTo(x + tagW, y, x + tagW, y + r);
+        ctx.lineTo(x + tagW, y + tagH - r);
+        ctx.quadraticCurveTo(x + tagW, y + tagH, x + tagW - r, y + tagH);
+        ctx.lineTo(x + r, y + tagH);
+        ctx.quadraticCurveTo(x, y + tagH, x, y + tagH - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        lines.forEach(function (line, i) {
+          ctx.fillText(line, x + padX, y + padY + fontSize + i * lineH);
+        });
+        return { w: tagW, h: tagH };
       }
 
       function setText(el, text) {
@@ -859,6 +983,7 @@
       }
 
       function drawBoxes(predictions) {
+        lastDrawPredictions = predictions;
         // Lấy kích thước img đang render trong DOM
         var dispW = preview.offsetWidth;
         var dispH = preview.offsetHeight;
@@ -915,36 +1040,45 @@
             ctx.lineWidth = 2.5;
             ctx.strokeRect(bx1, by1, bw, bh);
 
-            // Label tag
+            // Label: dòng 1 = TRASH 44%, dòng 2 = loại rác chi tiết (nếu có)
             var pct = Math.round((b.confidence || pred.confidence) * 100);
-            var label = cls + " " + pct + "%";
-            var textW = ctx.measureText(label).width;
-            var tagH = FONT_SIZE + 8;
+            var subLine = formatSubtypeLine(b.subtype, b.subtype_confidence);
             var tagX = bx1;
-            var tagY = by1 - tagH;
+            var lineH = FONT_SIZE + 4;
+            var blockH = lineH + 8 + (subLine ? lineH + 8 : 0);
+            var tagY = by1 - blockH;
             if (tagY < 0) tagY = by1;
 
-            ctx.fillStyle = color.stroke;
-            // Rounded rect cho label
-            var r = 4;
-            ctx.beginPath();
-            ctx.moveTo(tagX + r, tagY);
-            ctx.lineTo(tagX + textW + 10 - r, tagY);
-            ctx.quadraticCurveTo(tagX + textW + 10, tagY, tagX + textW + 10, tagY + r);
-            ctx.lineTo(tagX + textW + 10, tagY + tagH - r);
-            ctx.quadraticCurveTo(tagX + textW + 10, tagY + tagH, tagX + textW + 10 - r, tagY + tagH);
-            ctx.lineTo(tagX + r, tagY + tagH);
-            ctx.quadraticCurveTo(tagX, tagY + tagH, tagX, tagY + tagH - r);
-            ctx.lineTo(tagX, tagY + r);
-            ctx.quadraticCurveTo(tagX, tagY, tagX + r, tagY);
-            ctx.closePath();
-            ctx.fill();
-
-            ctx.fillStyle = "#fff";
-            ctx.fillText(label, tagX + 5, tagY + FONT_SIZE + 2);
+            var mainTag = drawTag(ctx, tagX, tagY, [cls + " " + pct + "%"], color.stroke, FONT_SIZE);
+            if (subLine) {
+              var subColor = SUBTYPE_TAG_COLORS[b.subtype] || "#475569";
+              drawTag(ctx, tagX, tagY + mainTag.h, [subLine], subColor, Math.max(10, FONT_SIZE - 1));
+            }
           });
+
+          // Tóm tắt subtypes cấp ảnh (khi API trả subtypes[])
+          var summary = pred.subtypes;
+          if (cls === "TRASH" && summary && summary.length) {
+            var sumLines = ["Loại rác trong ảnh:"];
+            summary.forEach(function (s) {
+              var vi = SUBTYPE_VI[s.subtype] || s.subtype;
+              sumLines.push(
+                vi + " ×" + s.count + (s.confidence != null ? " (" + Math.round(s.confidence * 100) + "%)" : "")
+              );
+            });
+            var sumFont = Math.max(10, FONT_SIZE - 1);
+            ctx.font = "600 " + sumFont + "px 'JetBrains Mono', monospace";
+            drawTag(ctx, offX + 8, offY + renderH - 8 - sumLines.length * (sumFont + 4) - 8, sumLines, "rgba(15,23,42,0.88)", sumFont);
+            ctx.font = "700 " + FONT_SIZE + "px 'JetBrains Mono', monospace";
+          }
         });
       }
+
+      window.addEventListener("resize", function () {
+        if (lastDrawPredictions && previewFrame.classList.contains("has-image")) {
+          drawBoxes(lastDrawPredictions);
+        }
+      });
 
       function applyPreviewFromInput() {
         if (lastPreviewUrl) {
@@ -952,14 +1086,40 @@
           lastPreviewUrl = null;
         }
         clearCanvas();
+        pendingUploadFile = null;
         if (!fileInput.files || !fileInput.files.length) {
           previewFrame.classList.remove("has-image");
           preview.removeAttribute("src");
-          return;
+          showPreviewPlaceholder("Chưa có ảnh");
+          return Promise.resolve();
         }
-        lastPreviewUrl = URL.createObjectURL(fileInput.files[0]);
-        preview.src = lastPreviewUrl;
-        previewFrame.classList.add("has-image");
+
+        var raw = fileInput.files[0];
+        if (isHeicFile(raw)) {
+          previewFrame.classList.remove("has-image");
+          preview.removeAttribute("src");
+          showPreviewPlaceholder("Đang chuyển HEIC → JPG để xem trước…");
+        }
+
+        return prepareImageFile(raw)
+          .then(function (ready) {
+            pendingUploadFile = ready;
+            lastPreviewUrl = URL.createObjectURL(ready);
+            preview.onerror = function () {
+              previewFrame.classList.remove("has-image");
+              showPreviewPlaceholder("Không hiển thị được ảnh. Thử JPG/PNG.");
+            };
+            preview.onload = function () {
+              if (previewPlaceholder) previewPlaceholder.style.display = "none";
+            };
+            preview.src = lastPreviewUrl;
+            previewFrame.classList.add("has-image");
+          })
+          .catch(function (err) {
+            previewFrame.classList.remove("has-image");
+            preview.removeAttribute("src");
+            showPreviewPlaceholder("Lỗi: " + err.message);
+          });
       }
 
       fileZone.addEventListener("dragenter", function (e) {
@@ -997,14 +1157,16 @@
         lastPayload = null;
         confirmBtn.disabled = true;
         showConfirmNote("");
-        applyPreviewFromInput();
-        analyzeBtn.disabled = !fileInput.files || !fileInput.files.length;
+        analyzeBtn.disabled = true;
+        applyPreviewFromInput().then(function () {
+          analyzeBtn.disabled = !pendingUploadFile;
+        });
       });
 
       analyzeBtn.addEventListener("click", function () {
-        if (!fileInput.files || !fileInput.files.length) return;
+        if (!pendingUploadFile) return;
         var fd = new FormData();
-        fd.append("image", fileInput.files[0]);
+        fd.append("image", pendingUploadFile, pendingUploadFile.name || "image.jpg");
 
         busy.hidden = false;
         analyzeBtn.disabled = true;
@@ -1013,9 +1175,9 @@
 
         fetch("/api/v1/classify-upload", { method: "POST", body: fd })
           .then(function (r) {
-            return r.json().then(function (j) {
-              if (!r.ok) throw new Error(j.detail || r.statusText || String(r.status));
-              return j;
+            if (r.ok) return r.json();
+            return parseApiError(r).then(function (msg) {
+              throw new Error(msg || String(r.status));
             });
           })
           .then(function (data) {
@@ -1058,6 +1220,10 @@
             lines.push(
               "scene_classifier_active: " + data.scene_classifier_active +
               " | scene_model_version: " + (data.scene_model_version || "(off)")
+            );
+            lines.push(
+              "trash_subtype_active: " + !!data.trash_subtype_active +
+              " (bật TRASH_SUBTYPE_MODEL_PATH trong .env)"
             );
             if (data.scene_scores) {
               lines.push("scene_scores (WATER/SMOKE): " + JSON.stringify(data.scene_scores));

@@ -14,14 +14,17 @@ from app.core.training_jobs import (
     convert_dataset_zip,
     filter_classes_zip,
     get_scene_training_orchestrator,
+    get_subtype_training_orchestrator,
     get_training_orchestrator,
     inspect_dataset_zip,
+    merge_subtype_zips_direct,
     merge_zips_direct,
     restructure_dataset_zip,
     split_dataset_zip,
 )
 from app.models.training import (
     CreateSceneTrainingJobRequest,
+    CreateSubtypeTrainingJobRequest,
     CreateTrainingJobRequest,
     DatasetInspectResponse,
     DatasetUploadResponse,
@@ -29,6 +32,9 @@ from app.models.training import (
     SceneDatasetUploadResponse,
     SceneTrainingJobListResponse,
     SceneTrainingJobResponse,
+    SubtypeDatasetUploadResponse,
+    SubtypeTrainingJobListResponse,
+    SubtypeTrainingJobResponse,
     TrainingJobListResponse,
     TrainingJobResponse,
     TrainingLogResponse,
@@ -118,18 +124,27 @@ async def restructure_dataset(
     dataset_zip: Annotated[
         UploadFile,
         File(
-            description="ZIP with train/<imgs> + labels/<txts>. Converts to images/train,val + labels/train,val."
+            description="ZIP with train/<imgs> + labels/<txts>. Converts to images/train,val,test + labels/train,val,test."
         ),
     ],
     val_fraction: float = 0.15,
+    test_fraction: float = 0.15,
 ) -> Response:
     blob = await dataset_zip.read()
     if not blob:
         raise HTTPException(status_code=400, detail="Empty zip.")
     if not (0.0 < val_fraction < 1.0):
         raise HTTPException(status_code=400, detail="val_fraction must be between 0 and 1.")
+    if not (0.0 < test_fraction < 1.0):
+        raise HTTPException(status_code=400, detail="test_fraction must be between 0 and 1.")
+    if val_fraction + test_fraction >= 1.0:
+        raise HTTPException(
+            status_code=400, detail="val_fraction + test_fraction phải nhỏ hơn 1.0."
+        )
     try:
-        out_bytes, stats = restructure_dataset_zip(blob, val_fraction=val_fraction)
+        out_bytes, stats = restructure_dataset_zip(
+            blob, val_fraction=val_fraction, test_fraction=test_fraction
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     filename = (dataset_zip.filename or "dataset").removesuffix(".zip") + "_structured.zip"
@@ -163,19 +178,17 @@ async def inspect_dataset(
 @router.post("/datasets/preview-labels")
 async def preview_labels(
     dataset_zip: Annotated[UploadFile, File(description="YOLO ZIP to preview.")],
-    target_class: Annotated[
-        str, Form(description="TRASH|WATER|SMOKE — class_id sẽ remap về")
-    ] = "TRASH",
+    target_class: Annotated[str, Form(description="TRASH|WATER — class_id sẽ remap về")] = "TRASH",
 ) -> Response:
     """Đọc ZIP server-side, trả JSON: image_count, label_count, label_format, sample_lines (sau remap)."""
     blob = await dataset_zip.read()
     if not blob:
         raise HTTPException(status_code=400, detail="Empty zip.")
 
-    target_ids = {"TRASH": 0, "WATER": 1, "SMOKE": 2}
+    target_ids = {"TRASH": 0, "WATER": 1}
     target_class = target_class.strip().upper()
     if target_class not in target_ids:
-        raise HTTPException(status_code=400, detail="target_class phải là TRASH, WATER hoặc SMOKE.")
+        raise HTTPException(status_code=400, detail="target_class phải là TRASH hoặc WATER.")
     new_id = target_ids[target_class]
 
     image_exts = {".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"}
@@ -313,36 +326,49 @@ async def merge_datasets(body: MergeDatasetsRequest) -> DatasetUploadResponse:
 
 @router.post("/datasets/merge-zips")
 async def merge_zips_endpoint(
-    zip_0: Annotated[UploadFile | None, File(description="ZIP dataset cho slot 0")] = None,
-    zip_1: Annotated[UploadFile | None, File(description="ZIP dataset cho slot 1")] = None,
-    zip_2: Annotated[UploadFile | None, File(description="ZIP dataset cho slot 2")] = None,
-    class_0: Annotated[str, Form(description="Target class slot 0: TRASH|WATER|SMOKE")] = "",
-    class_1: Annotated[str, Form(description="Target class slot 1: TRASH|WATER|SMOKE")] = "",
-    class_2: Annotated[str, Form(description="Target class slot 2: TRASH|WATER|SMOKE")] = "",
+    zips: Annotated[
+        list[UploadFile],
+        File(description="Một hoặc nhiều ZIP YOLO; mỗi ZIP gán TRASH hoặc WATER qua classes_json."),
+    ],
+    classes_json: Annotated[
+        str,
+        Form(description='JSON array class theo thứ tự ZIP, VD: ["WATER","WATER","TRASH"]'),
+    ],
 ) -> Response:
-    """Nhận tối đa 3 ZIP (mỗi cái 1 class) → gộp thành 1 ZIP chuẩn YOLO 3-class.
+    """Gộp nhiều ZIP (mỗi ZIP 1 class target) → 1 ZIP chuẩn YOLO 2-class TRASH/WATER.
 
-    Form fields: zip_0/zip_1/zip_2 (file), class_0/class_1/class_2 (TRASH|WATER|SMOKE).
+    Form fields: ``zips`` (lặp lại cho mỗi file), ``classes_json`` (mảng TRASH|WATER).
     Trả về ZIP download + header X-Stats (JSON).
     """
+    if not zips:
+        raise HTTPException(status_code=400, detail="Cần ít nhất 1 file ZIP.")
+    try:
+        classes: list[str] = json.loads(classes_json)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"classes_json invalid: {exc}") from exc
+    if not isinstance(classes, list) or len(classes) != len(zips):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Số class ({len(classes) if isinstance(classes, list) else 0}) phải khớp số ZIP ({len(zips)}).",
+        )
+
     slots: list[tuple[bytes, str]] = []
-    pairs = [(zip_0, class_0), (zip_1, class_1), (zip_2, class_2)]
-    for idx, (upload, cls) in enumerate(pairs):
-        if upload is None:
-            continue
+    for idx, (upload, cls) in enumerate(zip(zips, classes, strict=True)):
         blob = await upload.read()
         if not blob:
             continue
-        cls = cls.strip().upper()
-        if cls not in ("TRASH", "WATER", "SMOKE"):
+        if not isinstance(cls, str) or not cls.strip():
+            raise HTTPException(status_code=400, detail=f"Slot {idx}: class không được rỗng.")
+        cls_norm = cls.strip().upper()
+        if cls_norm not in ("TRASH", "WATER"):
             raise HTTPException(
                 status_code=400,
-                detail=f"Slot {idx}: class phải là TRASH, WATER hoặc SMOKE (nhận '{cls}').",
+                detail=f"Slot {idx}: class phải là TRASH hoặc WATER (nhận '{cls}').",
             )
-        slots.append((blob, cls))
+        slots.append((blob, cls_norm))
 
-    if len(slots) < 2:
-        raise HTTPException(status_code=400, detail="Cần ít nhất 2 slot ZIP để merge.")
+    if not slots:
+        raise HTTPException(status_code=400, detail="Tất cả ZIP đều rỗng.")
 
     try:
         merged_bytes, stats = merge_zips_direct(slots)
@@ -443,7 +469,7 @@ async def upload_scene_dataset_zip(
     dataset_zip: Annotated[
         UploadFile,
         File(
-            description="Zip with images/train/{WATER,SMOKE,NEGATIVE}/ folders (optionally images/val/)."
+            description="Zip with images/train/{WATER,NEGATIVE}/ folders (optionally images/val/)."
         ),
     ],
 ) -> SceneDatasetUploadResponse:
@@ -521,3 +547,171 @@ async def get_scene_training_job_logs(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     return TrainingLogResponse(**payload)
+
+
+# ---------------------------------------------------------------------------
+# Trash subtype classifier (EfficientNet-B0, ImageFolder — no .txt)
+# ---------------------------------------------------------------------------
+
+
+@router.post("/subtype/datasets/merge-zips")
+async def merge_subtype_zips_endpoint(
+    zips: Annotated[
+        list[UploadFile],
+        File(description="Một hoặc nhiều ZIP; mỗi ZIP gán 1 class qua classes_json."),
+    ],
+    classes_json: Annotated[
+        str,
+        Form(
+            description='JSON array class theo thứ tự ZIP, VD: ["RECYCLABLE","MEDICAL","ORGANIC"]'
+        ),
+    ],
+    val_fraction: Annotated[
+        float,
+        Form(description="Tỷ lệ val khi gộp (0.05–0.40). Mặc định 0.15."),
+    ] = 0.15,
+    also_register: Annotated[
+        bool,
+        Form(description="Nếu true: lưu dataset trên server và trả X-Dataset-Id để train ngay."),
+    ] = False,
+) -> Response:
+    """Gộp nhiều ZIP subtype → 1 ZIP chuẩn images/train|val/{6 classes}/ (không .txt)."""
+    if not zips:
+        raise HTTPException(status_code=400, detail="Cần ít nhất 1 file ZIP.")
+    try:
+        classes: list[str] = json.loads(classes_json)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"classes_json invalid: {exc}") from exc
+    if not isinstance(classes, list) or len(classes) != len(zips):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Số class ({len(classes) if isinstance(classes, list) else 0}) phải khớp số ZIP ({len(zips)}).",
+        )
+
+    slots: list[tuple[bytes, str]] = []
+    for upload, cls in zip(zips, classes, strict=True):
+        blob = await upload.read()
+        if not blob:
+            continue
+        if not isinstance(cls, str) or not cls.strip():
+            raise HTTPException(status_code=400, detail="Mỗi class phải là chuỗi không rỗng.")
+        slots.append((blob, cls.strip().upper()))
+
+    if not slots:
+        raise HTTPException(status_code=400, detail="Tất cả ZIP đều rỗng.")
+
+    try:
+        merged_bytes, stats = merge_subtype_zips_direct(
+            slots, val_fraction=val_fraction, test_fraction=0.15
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    headers: dict[str, str] = {
+        "Content-Disposition": 'attachment; filename="trash_subtype_merged.zip"',
+        "X-Stats": json.dumps(stats),
+    }
+    if also_register:
+        orch = get_subtype_training_orchestrator()
+        try:
+            reg = orch.ingest_merged_zip(filename="trash_subtype_merged.zip", content=merged_bytes)
+            headers["X-Dataset-Id"] = reg["dataset_id"]
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return Response(content=merged_bytes, media_type="application/zip", headers=headers)
+
+
+@router.post("/subtype/datasets/upload", response_model=SubtypeDatasetUploadResponse)
+async def upload_subtype_dataset_zip(
+    dataset_zip: Annotated[
+        UploadFile,
+        File(
+            description="ZIP ImageFolder: images/train|val/{CONSTRUCTION,ELECTRONIC,HAZARDOUS,HOUSEHOLD,MEDICAL,ORGANIC,RECYCLABLE}/"
+        ),
+    ],
+) -> SubtypeDatasetUploadResponse:
+    blob = await dataset_zip.read()
+    if not blob:
+        raise HTTPException(status_code=400, detail="Empty dataset zip.")
+    if not dataset_zip.filename:
+        raise HTTPException(status_code=400, detail="Dataset filename is required.")
+    orchestrator = get_subtype_training_orchestrator()
+    try:
+        payload = orchestrator.upload_dataset(filename=dataset_zip.filename, content=blob)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SubtypeDatasetUploadResponse(
+        dataset_id=payload["dataset_id"],
+        created_at=payload["created_at"],
+        summary=payload["summary"],
+    )
+
+
+@router.post("/subtype/jobs", response_model=SubtypeTrainingJobResponse)
+async def create_subtype_training_job(
+    body: CreateSubtypeTrainingJobRequest,
+) -> SubtypeTrainingJobResponse:
+    orchestrator = get_subtype_training_orchestrator()
+    try:
+        payload = orchestrator.create_job(
+            dataset_id=body.dataset_id,
+            run_name=body.run_name,
+            epochs=body.epochs,
+            batch=body.batch,
+            lr=body.lr,
+            output_path=body.output_path,
+        )
+        detail = orchestrator.get_job(payload["job_id"])
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SubtypeTrainingJobResponse(**detail)
+
+
+@router.get("/subtype/jobs", response_model=SubtypeTrainingJobListResponse)
+async def list_subtype_training_jobs(
+    limit: int = Query(10, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+) -> SubtypeTrainingJobListResponse:
+    orchestrator = get_subtype_training_orchestrator()
+    payload = orchestrator.list_jobs(limit=limit, offset=offset)
+    return SubtypeTrainingJobListResponse(
+        items=[SubtypeTrainingJobResponse(**job) for job in payload["items"]],
+        total=payload["total"],
+        limit=payload["limit"],
+        offset=payload["offset"],
+    )
+
+
+@router.get("/subtype/jobs/{job_id}", response_model=SubtypeTrainingJobResponse)
+async def get_subtype_training_job(job_id: str) -> SubtypeTrainingJobResponse:
+    orchestrator = get_subtype_training_orchestrator()
+    try:
+        payload = orchestrator.get_job(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return SubtypeTrainingJobResponse(**payload)
+
+
+@router.get("/subtype/jobs/{job_id}/logs", response_model=TrainingLogResponse)
+async def get_subtype_training_job_logs(
+    job_id: str,
+    offset: int = 0,
+    limit: int = 20000,
+) -> TrainingLogResponse:
+    orchestrator = get_subtype_training_orchestrator()
+    try:
+        payload = orchestrator.read_log(job_id, offset=offset, limit=limit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return TrainingLogResponse(**payload)
+
+
+@router.post("/subtype/jobs/{job_id}/stop", response_model=SubtypeTrainingJobResponse)
+async def stop_subtype_training_job(job_id: str) -> SubtypeTrainingJobResponse:
+    orchestrator = get_subtype_training_orchestrator()
+    try:
+        payload = orchestrator.kill_job(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return SubtypeTrainingJobResponse(**payload)

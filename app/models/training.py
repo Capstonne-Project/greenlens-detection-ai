@@ -145,3 +145,49 @@ class SceneTrainingJobResponse(BaseModel):
     error_text: str | None = None
     log_size_bytes: int | None = None
     dataset_summary: dict | None = None
+
+
+# --- Trash subtype classifier training schemas ---
+
+
+class SubtypeDatasetUploadResponse(BaseModel):
+    dataset_id: str
+    created_at: str
+    summary: dict
+
+
+class CreateSubtypeTrainingJobRequest(BaseModel):
+    dataset_id: str
+    run_name: str = Field(default="trash_subtype_classifier")
+    epochs: int = Field(default=100, ge=1, le=1000)
+    batch: int = Field(default=32, ge=1, le=512)
+    lr: float = Field(default=0.001, gt=0.0, le=1.0)
+    output_path: str | None = Field(
+        default=None,
+        description="Where to save weights. Defaults to ml/weights/trash_subtype_classifier.pt.",
+    )
+
+
+class SubtypeTrainingJobResponse(BaseModel):
+    job_id: str
+    status: Literal["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"]
+    dataset_id: str
+    run_name: str
+    created_at: str
+    updated_at: str
+    epochs: int
+    batch: int
+    lr: float
+    data_root: str
+    output_path: str
+    result: dict | None = None
+    error_text: str | None = None
+    log_size_bytes: int | None = None
+    dataset_summary: dict | None = None
+
+
+class SubtypeTrainingJobListResponse(BaseModel):
+    items: list[SubtypeTrainingJobResponse]
+    total: int
+    limit: int
+    offset: int

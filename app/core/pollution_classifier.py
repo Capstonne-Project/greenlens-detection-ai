@@ -23,7 +23,29 @@ except ImportError:  # pragma: no cover
     YOLO = None  # type: ignore[misc, assignment]
 
 
-POLLUTION_CLASS_CODES = frozenset({"TRASH", "WATER", "SMOKE"})
+POLLUTION_CLASS_CODES = frozenset({"TRASH", "WATER"})
+
+
+def _aggregate_subtypes(boxes: list[dict]) -> list[dict] | None:
+    """Aggregate per-box subtype labels into a sorted summary list."""
+    counts: dict[str, int] = {}
+    best_conf: dict[str, float] = {}
+    for box in boxes:
+        st = box.get("subtype")
+        sc = box.get("subtype_confidence", 0.0) or 0.0
+        if st and st != "UNKNOWN":
+            counts[st] = counts.get(st, 0) + 1
+            best_conf[st] = max(best_conf.get(st, 0.0), sc)
+    if not counts:
+        return None
+    return sorted(
+        [
+            {"subtype": st, "count": cnt, "confidence": round(best_conf[st], 4)}
+            for st, cnt in counts.items()
+        ],
+        key=lambda x: (-x["count"], -x["confidence"]),
+    )
+
 
 _CLASS_SYNONYMS: dict[str, str] = {
     "GARBAGE": "TRASH",
@@ -33,9 +55,6 @@ _CLASS_SYNONYMS: dict[str, str] = {
     "SEWAGE": "WATER",
     "WASTEWATER": "WATER",
     "EFFLUENT": "WATER",
-    "SMOG": "SMOKE",
-    "PLUME": "SMOKE",
-    "AIR_POLLUTION": "SMOKE",
 }
 
 
@@ -84,6 +103,8 @@ class ClassificationResult:
     scene_model_version: str | None = None
 
     scene_scores: dict[str, float] | None = None
+
+    trash_subtype_active: bool = False
 
 
 def _format_model_version(
@@ -162,7 +183,7 @@ def _merge_yolo_and_scene(
     """Merge YOLO bbox results with scene classifier probabilities.
 
     YOLO is authoritative for all 4 classes (bbox evidence takes priority).
-    Scene classifier supplements WATER/SMOKE only when YOLO already detected at
+    Scene classifier supplements WATER only when YOLO already detected at
     least one object — this prevents scene from solo-deciding when the image has
     no detectable objects at all (e.g. a trash pile YOLO missed).
     """
@@ -175,7 +196,7 @@ def _merge_yolo_and_scene(
     # Scene classifier only supplements when YOLO already saw something.
     # If YOLO found zero boxes, scene alone is not reliable enough to assert a class.
     if raw_detector_boxes > 0:
-        for cls in ("WATER", "SMOKE"):
+        for cls in ("WATER",):
             if cls not in merged:
                 prob = scene_proba.get(cls, 0.0)
                 if prob >= scene_threshold:
@@ -192,7 +213,7 @@ def _merge_yolo_and_scene(
 class PollutionClassifier:
     """Lazy-load Ultralytics detector + EfficientNet-B0 scene classifier; runs in parallel."""
 
-    __slots__ = ("_attempted_load", "_model", "_scene_clf", "_settings")
+    __slots__ = ("_attempted_load", "_model", "_scene_clf", "_settings", "_trash_subtype_clf")
 
     def __init__(self, settings: Settings | None = None) -> None:
         self._settings = settings or get_settings()
@@ -200,10 +221,11 @@ class PollutionClassifier:
         self._model: Any | None = None
         self._attempted_load = False
 
-        # Lazy-import to avoid circular
         from app.core.scene_classifier import ScenePollutionClassifier
+        from app.core.trash_subtype_classifier import TrashSubtypeClassifier
 
         self._scene_clf = ScenePollutionClassifier(self._settings)
+        self._trash_subtype_clf = TrashSubtypeClassifier(self._settings)
 
     def model_is_loaded(self) -> bool:
         self._ensure_model()
@@ -294,12 +316,22 @@ class PollutionClassifier:
 
         coverage_ratio = min(float(coverage_sum), 1.0)
 
+        # Stage 2: classify trash subtype per bbox when model is available
+        if self._trash_subtype_clf.is_loaded() and "TRASH" in class_raw_boxes:
+            for box_info in class_raw_boxes["TRASH"]:
+                subtype, subtype_conf = self._trash_subtype_clf.predict_subtype(
+                    rgb, box_info["x1"], box_info["y1"], box_info["x2"], box_info["y2"]
+                )
+                box_info["subtype"] = subtype
+                box_info["subtype_confidence"] = subtype_conf
+
         predictions: list[dict[str, Any]] = [
             {
                 "class": cls,
                 "confidence": round(class_best_conf[cls], 4),
                 "bbox_count": count,
                 "boxes": class_raw_boxes[cls],
+                "subtypes": _aggregate_subtypes(class_raw_boxes[cls]) if cls == "TRASH" else None,
             }
             for cls, count in sorted(
                 class_boxes.items(),
@@ -335,7 +367,7 @@ class PollutionClassifier:
         mapped_pollution_boxes = 0
         raw_detector_boxes = 0
         max_mapped_confidence = 0.0
-        scene_proba: dict[str, float] = {"WATER": 0.0, "SMOKE": 0.0}
+        scene_proba: dict[str, float] = {"WATER": 0.0}
 
         if yolo_loaded and scene_loaded:
             with ThreadPoolExecutor(max_workers=2) as pool:
@@ -411,6 +443,7 @@ class PollutionClassifier:
         scene_ver = (
             (settings.scene_classifier_version.strip() or "loaded") if scene_loaded else None
         )
+        trash_subtype_active = self._trash_subtype_clf.is_loaded()
 
         return ClassificationResult(
             predictions=predictions,
@@ -430,4 +463,5 @@ class PollutionClassifier:
             detector_model_version=detector_ver,
             scene_model_version=scene_ver,
             scene_scores=scene_scores_out,
+            trash_subtype_active=trash_subtype_active,
         )

@@ -934,7 +934,8 @@
         font-family: var(--font-mono);
       }
       #logBox,
-      #sceneLogBox {
+      #sceneLogBox,
+      #subtypeLogBox {
         margin: 0;
         padding: 0.92rem 1rem 1.15rem;
         min-height: 248px;
@@ -945,13 +946,16 @@
         font-size: 0.78rem;
         line-height: 1.45;
         color: var(--terminal-fg);
+        background: transparent;
       }
       #logBox::-webkit-scrollbar,
-      #sceneLogBox::-webkit-scrollbar {
+      #sceneLogBox::-webkit-scrollbar,
+      #subtypeLogBox::-webkit-scrollbar {
         width: 9px;
       }
       #logBox::-webkit-scrollbar-thumb,
-      #sceneLogBox::-webkit-scrollbar-thumb {
+      #sceneLogBox::-webkit-scrollbar-thumb,
+      #subtypeLogBox::-webkit-scrollbar-thumb {
         background: rgba(52, 211, 153, 0.28);
         border-radius: 999px;
       }
@@ -1019,6 +1023,9 @@
         </a>
         <a id="navScene" onclick="switchSection('scene')">
           <span class="nav-icon">🌊</span> Scene Classifier
+        </a>
+        <a id="navSubtype" onclick="switchSection('subtype')">
+          <span class="nav-icon">♻️</span> Loại rác chi tiết
         </a>
         <a id="navMerge" onclick="switchSection('merge')">
           <span class="nav-icon">🗂️</span> Gộp Dataset
@@ -1128,10 +1135,9 @@
 
             <!-- Class breakdown -->
             <div style="font-size:0.73rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.45rem;">Phân bổ class — tổng hợp dataset đã train</div>
-            <div class="stat-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:0.9rem" id="yoloClassStats">
+            <div class="stat-row" style="grid-template-columns:repeat(2,1fr);margin-bottom:0.9rem" id="yoloClassStats">
               <div class="stat-box"><div class="stat-val green" id="classTrash">—</div><div class="stat-lbl">🗑️ TRASH</div></div>
               <div class="stat-box"><div class="stat-val blue" id="classWater">—</div><div class="stat-lbl">💧 WATER</div></div>
-              <div class="stat-box"><div class="stat-val purple" id="classSmoke">—</div><div class="stat-lbl">🌫️ SMOKE</div></div>
             </div>
             <p style="margin:0 0 0.9rem;font-size:0.72rem;color:var(--muted);font-weight:600" id="yoloDatasetNote"></p>
 
@@ -1157,7 +1163,6 @@
             <div class="model-meta-row">
               <span class="meta-chip"><span class="meta-lbl">Lần train</span><span id="sceneTotalJobs">—</span></span>
               <span class="meta-chip"><span class="meta-lbl">WATER</span><span id="sceneWaterImages">—</span></span>
-              <span class="meta-chip"><span class="meta-lbl">SMOKE</span><span id="sceneSmokeImages">—</span></span>
               <span class="meta-chip"><span class="meta-lbl">NEGATIVE</span><span id="sceneNegativeImages">—</span></span>
             </div>
 
@@ -1183,7 +1188,7 @@
           <p class="intro">
             Cấu trúc ZIP: <code>images/train/</code>, <code>images/val/</code>, <code>labels/train/</code>,
             <code>labels/val/</code>. Nhãn YOLO format: <code>class_id x_center y_center width height</code>
-            với <strong>0=TRASH · 1=WATER · 2=SMOKE</strong> (tọa độ normalize 0–1).
+            với <strong>0=TRASH · 1=WATER</strong> (tọa độ normalize 0–1).
             Chưa đúng format? Dùng tab <strong>🔄 Convert Dataset</strong> để chuyển đổi trước.
           </p>
           <input id="datasetZip" type="file" accept=".zip" />
@@ -1258,7 +1263,7 @@
           <div class="card-top-shine" aria-hidden="true"></div>
           <h3><span class="step-num">1</span> Upload dataset ZIP — Scene Classifier</h3>
           <p class="intro">
-            Cấu trúc ZIP: <code>images/train/WATER/</code>, <code>images/train/SMOKE/</code>,
+            Cấu trúc ZIP: <code>images/train/WATER/</code>,
             <code>images/train/NEGATIVE/</code> (và tùy chọn <code>images/val/</code> — tự split nếu thiếu).
             Mỗi thư mục chứa ảnh <code>.jpg</code> / <code>.png</code> trực tiếp, không cần nhãn txt.
           </p>
@@ -1303,107 +1308,142 @@
         </div>
       </div>
 
+      <!-- ===== TRASH SUBTYPE (merge + train) ===== -->
+      <div id="sectionSubtype" class="tab-section">
+        <div style="margin-bottom:1rem">
+          <h2 style="margin:0;font-size:1.12rem;font-weight:800;color:var(--text)">♻️ Phân loại loại rác chi tiết (Subtype)</h2>
+          <p style="margin:0.25rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">
+            Sau khi YOLO nhận <strong>TRASH</strong> → model này phân <strong>7 loại</strong> rác. <strong>Không cần file nhãn .txt</strong>, chỉ cần ảnh trong ZIP.
+          </p>
+        </div>
+
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3 style="margin-bottom:0.5rem;font-size:0.95rem">📋 7 loại rác (mã API giữ tiếng Anh)</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.45rem;font-size:0.8rem;line-height:1.45">
+            <div><code>HOUSEHOLD</code> — Sinh hoạt (túi nilon, quần áo cũ, rác hỗn hợp)</div>
+            <div><code>RECYCLABLE</code> — Tái chế (chai PET, lon, carton)</div>
+            <div><code>ORGANIC</code> — Hữu cơ (<strong>thức ăn thừa</strong>, rau củ hỏng)</div>
+            <div><code>MEDICAL</code> — Y tế (khẩu trang, kim tiêm)</div>
+            <div><code>ELECTRONIC</code> — Điện tử (điện thoại, dây cáp)</div>
+            <div><code>CONSTRUCTION</code> — Xây dựng (gạch, xi măng)</div>
+            <div><code>HAZARDOUS</code> — Nguy hại (pin, bình hóa chất)</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">1</span> Gộp nhiều ZIP → 1 bộ dữ liệu chuẩn</h3>
+          <p class="intro">
+            Thêm từng ZIP (TrashNet, Kaggle, ảnh tự chụp…) — <strong>mỗi ZIP chọn đúng loại rác</strong>.
+            Hệ thống gộp và tự chia <code>train</code> / <code>val</code> (mặc định 85% / 15%).
+            Tải file <code>trash_subtype_merged.zip</code> hoặc tick đăng ký để huấn luyện ngay bên dưới.
+          </p>
+          <label style="display:block;margin-bottom:0.5rem">
+            <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase">Thêm file ZIP</span>
+            <input id="subtypeZipInput" type="file" accept=".zip" multiple style="margin-top:0.35rem;display:block" />
+          </label>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">
+            <button class="secondary" type="button" id="subtypeClearAllZips" style="font-size:0.8rem">Xóa tất cả ZIP</button>
+            <span id="subtypeZipCount" style="font-size:0.8rem;color:var(--muted);align-self:center;font-weight:600">0 tệp</span>
+          </div>
+          <div id="subtypeZipClassList" style="margin-bottom:0.75rem"></div>
+          <div class="form-grid" style="margin-bottom:0.75rem">
+            <label>Tỷ lệ val khi gộp (%) <input id="subtypeValFraction" type="number" value="0.15" min="0.05" max="0.4" step="0.01" title="0.15 = 15% ảnh vào val" /></label>
+            <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1.4rem">
+              <input id="subtypeAlsoRegister" type="checkbox" checked />
+              Lưu dataset trên server (tự điền Mã dataset để train)
+            </label>
+          </div>
+          <button class="primary" type="button" id="subtypeMergeBtn">Gộp và tải ZIP chuẩn</button>
+          <p id="subtypeMergeResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">2</span> Tải ZIP đã gộp lên server (nếu chưa tick ở bước 1)</h3>
+          <p class="intro">
+            Cấu trúc bên trong ZIP:
+            <code>images/train/HOUSEHOLD/</code> … <code>images/val/MEDICAL/</code> (7 thư mục loại rác).
+          </p>
+          <input id="subtypeDatasetZip" type="file" accept=".zip" />
+          <button class="secondary" type="button" id="subtypeUploadBtn">Tải lên và kiểm tra</button>
+          <p id="subtypeDatasetResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">3</span> Huấn luyện — EfficientNet-B0 (7 loại rác)</h3>
+          <div class="form-grid">
+            <label>Mã dataset <input id="subtypeDatasetId" type="text" placeholder="tds_xxxxx" /></label>
+            <label>Tên lần chạy <input id="subtypeRunName" type="text" value="trash_subtype_classifier" /></label>
+            <label>Số epoch <input id="subtypeEpochs" type="number" value="100" min="1" /></label>
+            <label>Batch <input id="subtypeBatch" type="number" value="32" min="1" /></label>
+            <label>Tốc độ học (LR) <input id="subtypeLr" type="number" value="0.001" step="0.0001" min="0.000001" /></label>
+            <label>File weights đầu ra <input id="subtypeOutputPath" type="text" placeholder="ml/weights/trash_subtype_classifier.pt" /></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <button class="primary" type="button" id="subtypeStartBtn">Bắt đầu huấn luyện</button>
+            <button
+              class="secondary"
+              type="button"
+              id="subtypeStopBtn"
+              style="display:none;background:#fef2f2;color:#b91c1c;border-color:#fca5a5"
+            >
+              Dừng huấn luyện
+            </button>
+          </div>
+          <p id="subtypeJobResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">4</span> Nhật ký huấn luyện</h3>
+          <div class="status-row">
+            <div>Mã job: <span id="subtypeCurrentJob" class="pill">(chưa có)</span></div>
+            <div>Trạng thái: <span id="subtypeJobStatus" class="pill ok-pill">RẢNH</span></div>
+            <div id="subtypeResultPath" style="font-size:0.8rem;color:var(--muted)"></div>
+          </div>
+          <div class="terminal" role="region" aria-label="Nhật ký huấn luyện loại rác chi tiết">
+            <div class="terminal-bar">
+              <span></span><span></span><span></span><span class="terminal-title">nhật ký — loại rác chi tiết</span>
+            </div>
+            <div id="subtypeLogBox"></div>
+          </div>
+          <p style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">
+            Khi trạng thái <strong>Thành công</strong>, thêm vào <code>.env</code>:<br/>
+            <code>TRASH_SUBTYPE_MODEL_PATH=ml/weights/trash_subtype_classifier.pt</code>
+          </p>
+        </div>
+      </div>
+
       <!-- ===== MERGE DATASET ===== -->
       <div id="sectionMerge" class="tab-section">
 
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
           <div>
-            <h2 style="margin:0;font-size:1.12rem;font-weight:800;letter-spacing:-0.025em;color:var(--text)">🗂️ Gộp Dataset — 3 class → 1 ZIP</h2>
-            <p style="margin:0.2rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">Upload tối đa 3 ZIP, chỉ định class cho từng cái, xem preview label, rồi download 1 ZIP gộp chuẩn YOLO</p>
+            <h2 style="margin:0;font-size:1.12rem;font-weight:800;letter-spacing:-0.025em;color:var(--text)">🗂️ Gộp Dataset — nhiều ZIP → 1 ZIP</h2>
+            <p style="margin:0.2rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">Thêm bao nhiêu ZIP cũng được (nhiều bộ WATER, nhiều bộ TRASH…), chọn class từng file, gộp chuẩn YOLO 2-class</p>
           </div>
         </div>
 
-        <!-- Slot cards -->
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1rem" id="mergeSlotGrid">
-
-          <!-- Slot 0 -->
-          <div class="card" id="mergeSlot0Card" style="margin-bottom:0">
-            <div class="card-top-shine" aria-hidden="true"></div>
-            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem">
-              <span style="display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:9px;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:1px solid rgba(16,185,129,0.22);font-size:0.8rem;font-weight:800;color:var(--brand-deep)">1</span>
-              <span style="font-size:0.9rem;font-weight:800;color:var(--text)">Dataset ZIP #1</span>
-            </div>
-
-            <label style="margin-bottom:0.6rem">
-              <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Class target</span>
-              <select id="mergeClass0" style="width:100%;margin-top:0.35rem;padding:0.5rem 0.7rem;border-radius:9px;border:1.5px solid #e2e8f0;font-weight:700;font-size:0.9rem;background:#fff;cursor:pointer">
-                <option value="TRASH">🗑️ TRASH — Rác thải</option>
-                <option value="WATER">💧 WATER — Ô nhiễm nước</option>
-                <option value="SMOKE">🌫️ SMOKE — Khói / Bụi</option>
-              </select>
-            </label>
-
-            <label style="display:block;margin-bottom:0.5rem">
-              <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">File ZIP</span>
-              <input type="file" id="mergeZip0" accept=".zip" style="margin-top:0.35rem" onchange="onMergeZipChange(0)" />
-            </label>
-
-            <div id="mergePreview0" style="display:none;margin-top:0.5rem;border-radius:9px;background:rgba(15,18,34,0.92);border:1px solid rgba(52,211,153,0.15);padding:0.6rem 0.8rem">
-              <div style="font-size:0.65rem;font-weight:800;letter-spacing:0.1em;color:rgba(134,239,172,0.6);text-transform:uppercase;margin-bottom:0.35rem">PREVIEW LABEL</div>
-              <pre id="mergePreviewText0" style="margin:0;font-family:var(--font-mono);font-size:0.74rem;color:#86efac;white-space:pre-wrap;line-height:1.5"></pre>
-              <div id="mergePreviewStats0" style="margin-top:0.4rem;font-size:0.7rem;color:rgba(134,239,172,0.55);font-family:var(--font-mono)"></div>
-            </div>
+        <!-- Dynamic ZIP queue -->
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3 style="margin-bottom:0.5rem;font-size:0.95rem">📁 Thêm file ZIP</h3>
+          <p style="margin:0 0 0.75rem;font-size:0.82rem;color:var(--muted);line-height:1.45">
+            Chọn nhiều file cùng lúc hoặc thêm từng lần — ví dụ gộp 5 dataset WATER từ Roboflow, rồi thêm 2 ZIP TRASH.
+          </p>
+          <label style="display:block;margin-bottom:0.5rem">
+            <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Thêm file ZIP</span>
+            <input id="mergeZipInput" type="file" accept=".zip" multiple style="margin-top:0.35rem;display:block" />
+          </label>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">
+            <button class="secondary" type="button" id="mergeClearAllZips" style="font-size:0.8rem">Xóa tất cả ZIP</button>
+            <span id="mergeZipCount" style="font-size:0.8rem;color:var(--muted);align-self:center;font-weight:600">0 tệp</span>
           </div>
-
-          <!-- Slot 1 -->
-          <div class="card" id="mergeSlot1Card" style="margin-bottom:0">
-            <div class="card-top-shine" aria-hidden="true"></div>
-            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem">
-              <span style="display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:9px;background:linear-gradient(135deg,#eff6ff,#dbeafe);border:1px solid rgba(59,130,246,0.22);font-size:0.8rem;font-weight:800;color:#1d4ed8">2</span>
-              <span style="font-size:0.9rem;font-weight:800;color:var(--text)">Dataset ZIP #2</span>
-            </div>
-
-            <label style="margin-bottom:0.6rem">
-              <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Class target</span>
-              <select id="mergeClass1" style="width:100%;margin-top:0.35rem;padding:0.5rem 0.7rem;border-radius:9px;border:1.5px solid #e2e8f0;font-weight:700;font-size:0.9rem;background:#fff;cursor:pointer">
-                <option value="TRASH">🗑️ TRASH — Rác thải</option>
-                <option value="WATER" selected>💧 WATER — Ô nhiễm nước</option>
-                <option value="SMOKE">🌫️ SMOKE — Khói / Bụi</option>
-              </select>
-            </label>
-
-            <label style="display:block;margin-bottom:0.5rem">
-              <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">File ZIP</span>
-              <input type="file" id="mergeZip1" accept=".zip" style="margin-top:0.35rem" onchange="onMergeZipChange(1)" />
-            </label>
-
-            <div id="mergePreview1" style="display:none;margin-top:0.5rem;border-radius:9px;background:rgba(15,18,34,0.92);border:1px solid rgba(52,211,153,0.15);padding:0.6rem 0.8rem">
-              <div style="font-size:0.65rem;font-weight:800;letter-spacing:0.1em;color:rgba(134,239,172,0.6);text-transform:uppercase;margin-bottom:0.35rem">PREVIEW LABEL</div>
-              <pre id="mergePreviewText1" style="margin:0;font-family:var(--font-mono);font-size:0.74rem;color:#86efac;white-space:pre-wrap;line-height:1.5"></pre>
-              <div id="mergePreviewStats1" style="margin-top:0.4rem;font-size:0.7rem;color:rgba(134,239,172,0.55);font-family:var(--font-mono)"></div>
-            </div>
-          </div>
-
-          <!-- Slot 2 -->
-          <div class="card" id="mergeSlot2Card" style="margin-bottom:0">
-            <div class="card-top-shine" aria-hidden="true"></div>
-            <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.75rem">
-              <span style="display:grid;place-items:center;width:1.75rem;height:1.75rem;border-radius:9px;background:linear-gradient(135deg,#fdf4ff,#f3e8ff);border:1px solid rgba(168,85,247,0.22);font-size:0.8rem;font-weight:800;color:#7e22ce">3</span>
-              <span style="font-size:0.9rem;font-weight:800;color:var(--text)">Dataset ZIP #3</span>
-            </div>
-
-            <label style="margin-bottom:0.6rem">
-              <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Class target</span>
-              <select id="mergeClass2" style="width:100%;margin-top:0.35rem;padding:0.5rem 0.7rem;border-radius:9px;border:1.5px solid #e2e8f0;font-weight:700;font-size:0.9rem;background:#fff;cursor:pointer">
-                <option value="TRASH">🗑️ TRASH — Rác thải</option>
-                <option value="WATER">💧 WATER — Ô nhiễm nước</option>
-                <option value="SMOKE" selected>🌫️ SMOKE — Khói / Bụi</option>
-              </select>
-            </label>
-
-            <label style="display:block;margin-bottom:0.5rem">
-              <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">File ZIP (tùy chọn)</span>
-              <input type="file" id="mergeZip2" accept=".zip" style="margin-top:0.35rem" onchange="onMergeZipChange(2)" />
-            </label>
-
-            <div id="mergePreview2" style="display:none;margin-top:0.5rem;border-radius:9px;background:rgba(15,18,34,0.92);border:1px solid rgba(52,211,153,0.15);padding:0.6rem 0.8rem">
-              <div style="font-size:0.65rem;font-weight:800;letter-spacing:0.1em;color:rgba(134,239,172,0.6);text-transform:uppercase;margin-bottom:0.35rem">PREVIEW LABEL</div>
-              <pre id="mergePreviewText2" style="margin:0;font-family:var(--font-mono);font-size:0.74rem;color:#86efac;white-space:pre-wrap;line-height:1.5"></pre>
-              <div id="mergePreviewStats2" style="margin-top:0.4rem;font-size:0.7rem;color:rgba(134,239,172,0.55);font-family:var(--font-mono)"></div>
-            </div>
-          </div>
-
-        </div><!-- /slot grid -->
+          <div id="mergeZipClassList" style="margin-bottom:0.25rem"></div>
+        </div>
 
         <!-- Summary + merge button -->
         <div class="card">
@@ -1411,10 +1451,9 @@
           <h3 style="margin-bottom:0.7rem">📦 Tổng hợp &amp; Gộp</h3>
 
           <!-- Live summary bar -->
-          <div id="mergeSummaryBar" style="display:grid;grid-template-columns:repeat(3,1fr);gap:0.55rem;margin-bottom:1rem">
+          <div id="mergeSummaryBar" style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.55rem;margin-bottom:1rem">
             <div class="stat-box" id="mergeSumTrash"><div class="stat-val green" id="mergeSumTrashVal">—</div><div class="stat-lbl">🗑️ TRASH ảnh</div></div>
             <div class="stat-box" id="mergeSumWater"><div class="stat-val blue" id="mergeSumWaterVal">—</div><div class="stat-lbl">💧 WATER ảnh</div></div>
-            <div class="stat-box" id="mergeSumSmoke"><div class="stat-val purple" id="mergeSumSmokeVal">—</div><div class="stat-lbl">🌫️ SMOKE ảnh</div></div>
           </div>
 
           <!-- data.yaml preview -->
@@ -1424,11 +1463,11 @@
               <pre style="margin:0;font-family:var(--font-mono);font-size:0.8rem;color:#86efac;line-height:1.6">path: .
 train: images/train
 val:   images/val
-nc: 3
+test:  images/test
+nc: 2
 names:
   0: TRASH
-  1: WATER
-  2: SMOKE</pre>
+  1: WATER</pre>
             </div>
           </div>
 
@@ -1464,7 +1503,7 @@ names:
               <div style="font-size:0.72rem;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem">Bước 2 — Convert class name</div>
               <div style="font-size:0.82rem;color:var(--text);font-weight:600;line-height:1.55">
                 Dùng <strong>Remap class names</strong> bên dưới.<br/>
-                Map tên class dataset → <code>TRASH</code> / <code>WATER</code> / <code>SMOKE</code>.<br/>
+                Map tên class dataset → <code>TRASH</code> / <code>WATER</code>.<br/>
                 Download ZIP đã convert.
               </div>
             </div>
@@ -1536,13 +1575,14 @@ names:
           <h3>Restructure — đổi cấu trúc thư mục sang chuẩn YOLO</h3>
           <p class="intro">
             Input ZIP có cấu trúc <code>train/&lt;ảnh&gt;</code> + <code>labels/&lt;txt&gt;</code>
-            → Output ZIP chuẩn <code>images/train</code>, <code>images/val</code>,
-            <code>labels/train</code>, <code>labels/val</code> sẵn để upload train.<br/>
-            Label tự convert OBB → AABB nếu cần. Val split mặc định 15%.
+            → Output ZIP chuẩn <code>images/train</code>, <code>images/val</code>, <code>images/test</code>,
+            <code>labels/train</code>, <code>labels/val</code>, <code>labels/test</code> sẵn để upload train.<br/>
+            Label tự convert OBB → AABB nếu cần. Split mặc định 70 / 15 / 15 (train/val/test), seed=42.
           </p>
           <div class="form-grid" style="margin-bottom:0.75rem">
             <label>ZIP đầu vào <input id="restructureZip" type="file" accept=".zip" /></label>
             <label>Val fraction (0.05–0.4) <input id="restructureValFrac" type="number" value="0.15" step="0.05" min="0.05" max="0.4" /></label>
+            <label>Test fraction (0.05–0.4) <input id="restructureTestFrac" type="number" value="0.15" step="0.05" min="0.05" max="0.4" /></label>
           </div>
           <button class="secondary" type="button" id="restructureBtn">Convert &amp; Download ZIP</button>
           <p id="restructureResult" class="result"></p>
@@ -1553,8 +1593,8 @@ names:
           <h3><span class="step-num">1</span> Remap class names</h3>
           <p class="intro">
             Upload dataset ZIP bất kỳ từ Roboflow, Kaggle, v.v. Server đọc <code>data.yaml</code>
-            và liệt kê class có trong dataset. Bạn map từng class sang <code>TRASH</code> / <code>WATER</code> / <code>SMOKE</code>
-            hoặc <code>SKIP</code> (xóa bỏ). Class ID sẽ được tự động re-index về đúng <strong>0·1·2</strong>.
+            và liệt kê class có trong dataset. Bạn map từng class sang <code>TRASH</code> / <code>WATER</code>
+            hoặc <code>SKIP</code> (xóa bỏ). Class ID sẽ được tự động re-index về đúng <strong>0·1</strong>.
           </p>
           <input id="convertZip" type="file" accept=".zip" />
           <button class="secondary" type="button" id="inspectBtn">Đọc class names</button>
@@ -1565,9 +1605,9 @@ names:
           <div class="card-top-shine" aria-hidden="true"></div>
           <h3><span class="step-num">2</span> Map class về đúng label dự án</h3>
           <p class="intro">
-            Chọn mỗi class trong dataset tương ứng với class nào của GreenLens (<code>TRASH · WATER · SMOKE</code>).
+            Chọn mỗi class trong dataset tương ứng với class nào của GreenLens (<code>TRASH · WATER</code>).
             Class chọn <code>SKIP</code> sẽ bị xóa khỏi tất cả label — dòng bbox đó không được train.
-            Server tự re-index class ID về 0·1·2 và ghi lại <code>data.yaml</code> mới.
+            Server tự re-index class ID về 0·1 và ghi lại <code>data.yaml</code> mới.
           </p>
           <div id="mappingRows" style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1rem"></div>
           <button class="primary" type="button" id="convertBtn">Convert &amp; Download ZIP</button>
@@ -1583,8 +1623,8 @@ names:
             → Map <code>0,1,2</code> về <code>TRASH</code> · Map <code>3: person</code> → <code>SKIP</code><br/>
             → Server đổi tất cả label về <code>class_id=0</code>, xóa dòng <code>person</code>, ghi lại <code>data.yaml</code> với <code>nc:1 · 0:TRASH</code><br/>
             → Download ZIP mới → Upload vào tab <strong>🎯 YOLO — Pollution</strong> để train.<br/><br/>
-            <strong>Tip quan trọng:</strong> Mỗi class từ Roboflow nên được map riêng — đừng merge WATER lẫn SMOKE vào TRASH vì model sẽ không phân biệt được.<br/>
-            Tải <strong>từng dataset riêng biệt</strong> cho từng class (TRASH riêng, WATER riêng, SMOKE riêng) → convert từng cái → upload lần lượt vào cùng 1 training job.
+            <strong>Tip quan trọng:</strong> Mỗi class từ Roboflow nên được map riêng — đừng merge WATER vào TRASH vì model sẽ không phân biệt được.<br/>
+            Tải <strong>từng dataset riêng biệt</strong> cho từng class (TRASH riêng, WATER riêng) → convert từng cái → upload lần lượt vào cùng 1 training job.
           </p>
         </div>
       </div>
@@ -1726,7 +1766,34 @@ names:
 
     <script>
       // ---- Section switcher (sidebar) ----
-      const _SECTIONS = ["overview", "yolo", "scene", "merge", "convert", "split", "history"];
+      const _SECTIONS = ["overview", "yolo", "scene", "subtype", "merge", "convert", "split", "history"];
+
+      const _SUBTYPE_CLASSES = [
+        "HOUSEHOLD", "RECYCLABLE", "ORGANIC", "MEDICAL", "ELECTRONIC", "CONSTRUCTION", "HAZARDOUS",
+      ];
+      const _SUBTYPE_CLASS_VI = {
+        HOUSEHOLD: "Sinh hoạt",
+        RECYCLABLE: "Tái chế",
+        ORGANIC: "Hữu cơ",
+        MEDICAL: "Y tế",
+        ELECTRONIC: "Điện tử",
+        CONSTRUCTION: "Xây dựng",
+        HAZARDOUS: "Nguy hại",
+      };
+      const _SUBTYPE_STATUS_VI = {
+        QUEUED: "Đang chờ",
+        RUNNING: "Đang chạy",
+        SUCCEEDED: "Thành công",
+        FAILED: "Thất bại",
+        IDLE: "Rảnh",
+      };
+      function _subtypeClassOption(code) {
+        const vi = _SUBTYPE_CLASS_VI[code] || code;
+        return `${vi} (${code})`;
+      }
+      function _subtypeStatusVi(status) {
+        return _SUBTYPE_STATUS_VI[status] || status;
+      }
       function switchSection(section) {
         _SECTIONS.forEach(s => {
           const el = document.getElementById("section" + s.charAt(0).toUpperCase() + s.slice(1));
@@ -1845,12 +1912,10 @@ names:
         let valImages = 0;
         let trash = 0;
         let water = 0;
-        let smoke = 0;
         for (const s of summaries.values()) {
           const cc = s.class_counts ?? {};
           trash += _numStat(cc["0"] ?? cc[0]);
           water += _numStat(cc["1"] ?? cc[1]);
-          smoke += _numStat(cc["2"] ?? cc[2]);
           trainImages += _numStat(s.image_count);
           valImages += _numStat(s.val_count ?? s.label_count);
         }
@@ -1860,7 +1925,6 @@ names:
           valImages,
           trash,
           water,
-          smoke,
         };
       }
 
@@ -1873,11 +1937,10 @@ names:
         for (const s of summaries.values()) {
           const tc = s.train_class_counts ?? {};
           water += _numStat(tc.WATER);
-          smoke += _numStat(tc.SMOKE);
           negative += _numStat(tc.NEGATIVE);
           totalTrain += _numStat(s.total_train_images);
         }
-        return { datasetCount: summaries.size, water, smoke, negative, totalTrain };
+        return { datasetCount: summaries.size, water, negative, totalTrain };
       }
 
       function _applyYoloAggregateStats(agg) {
@@ -1886,16 +1949,14 @@ names:
         document.getElementById("yoloValImages").textContent = has ? agg.valImages : "—";
         document.getElementById("classTrash").textContent = has ? agg.trash : "—";
         document.getElementById("classWater").textContent = has ? agg.water : "—";
-        document.getElementById("classSmoke").textContent = has ? agg.smoke : "—";
         document.getElementById("yoloDatasetNote").textContent = has
-          ? `Tổng hợp ${agg.datasetCount} dataset · ${agg.trainImages} ảnh train · ${agg.valImages} ảnh val · TRASH ${agg.trash} · WATER ${agg.water} · SMOKE ${agg.smoke}`
+          ? `Tổng hợp ${agg.datasetCount} dataset · ${agg.trainImages} ảnh train · ${agg.valImages} ảnh val · TRASH ${agg.trash} · WATER ${agg.water}`
           : "";
       }
 
       function _applySceneAggregateStats(agg) {
         const has = agg.datasetCount > 0;
         document.getElementById("sceneWaterImages").textContent = has ? agg.water : "—";
-        document.getElementById("sceneSmokeImages").textContent = has ? agg.smoke : "—";
         const negEl = document.getElementById("sceneNegativeImages");
         if (negEl) negEl.textContent = has ? agg.negative : "—";
         const classRowEl = document.getElementById("sceneClassRow");
@@ -1905,7 +1966,6 @@ names:
         }
         classRowEl.innerHTML = [
           ["WATER", agg.water],
-          ["SMOKE", agg.smoke],
           ["NEGATIVE", agg.negative],
         ]
           .map(([cls, cnt]) => `<span class="metrics-chip"><span>${cls}</span> ${cnt} ảnh</span>`)
@@ -1984,7 +2044,6 @@ names:
                 ? [
                     cc["0"] != null ? `TRASH ${cc["0"]}` : null,
                     cc["1"] != null ? `WATER ${cc["1"]}` : null,
-                    cc["2"] != null ? `SMOKE ${cc["2"]}` : null,
                   ].filter(Boolean).join(" · ")
                 : "—";
               return `<tr>
@@ -2228,11 +2287,10 @@ names:
                 <td>${s.label_count ?? "—"} labels</td>
                 <td>🗑️ <strong>${cc["0"] ?? cc[0] ?? "—"}</strong></td>
                 <td>💧 <strong>${cc["1"] ?? cc[1] ?? "—"}</strong></td>
-                <td>🌫️ <strong>${cc["2"] ?? cc[2] ?? "—"}</strong></td>
               </tr>`;
             }).join("");
             yoloDsEl.innerHTML = `<table>
-              <thead><tr><th>Dataset ID</th><th>Tổng ảnh</th><th>Labels</th><th>TRASH</th><th>WATER</th><th>SMOKE</th></tr></thead>
+              <thead><tr><th>Dataset ID</th><th>Tổng ảnh</th><th>Labels</th><th>TRASH</th><th>WATER</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>`;
           }
@@ -2256,12 +2314,11 @@ names:
                 <td style="font-family:var(--font-mono)">${dsId}</td>
                 <td><strong>${s.total_train_images ?? "—"}</strong> ảnh</td>
                 <td>WATER <strong>${tc["WATER"] ?? "—"}</strong></td>
-                <td>SMOKE <strong>${tc["SMOKE"] ?? "—"}</strong></td>
                 <td>NEGATIVE <strong>${tc["NEGATIVE"] ?? "—"}</strong></td>
               </tr>`;
             }).join("");
             sceneDsEl.innerHTML = `<table>
-              <thead><tr><th>Dataset ID</th><th>Tổng ảnh</th><th>WATER</th><th>SMOKE</th><th>NEGATIVE</th></tr></thead>
+              <thead><tr><th>Dataset ID</th><th>Tổng ảnh</th><th>WATER</th><th>NEGATIVE</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>`;
           }
@@ -2544,11 +2601,12 @@ names:
         const resultEl = document.getElementById("restructureResult");
         if (!f) { resultEl.textContent = "Vui lòng chọn file ZIP."; return; }
         const valFrac = parseFloat(document.getElementById("restructureValFrac").value) || 0.15;
+        const testFrac = parseFloat(document.getElementById("restructureTestFrac").value) || 0.15;
         resultEl.textContent = "Đang convert cấu trúc…";
         const form = new FormData();
         form.append("dataset_zip", f, f.name);
         try {
-          const resp = await fetch(`/api/v1/training/datasets/restructure?val_fraction=${valFrac}`, { method: "POST", body: form });
+          const resp = await fetch(`/api/v1/training/datasets/restructure?val_fraction=${valFrac}&test_fraction=${testFrac}`, { method: "POST", body: form });
           if (!resp.ok) {
             const err = await resp.json();
             throw new Error(err.detail || "Restructure failed");
@@ -2561,7 +2619,7 @@ names:
           const outName = f.name.replace(/\.zip$/i, "") + "_structured.zip";
           a.href = url; a.download = outName; a.click();
           URL.revokeObjectURL(url);
-          resultEl.textContent = `Download xong: ${outName} | train=${stats.train_images} ảnh / val=${stats.val_images} ảnh | labels=${stats.train_labels+stats.val_labels} | no_label=${stats.no_label} → upload vào tab Model 1 để train.`;
+          resultEl.textContent = `Download xong: ${outName} | train=${stats.train_images} / val=${stats.val_images} / test=${stats.test_images} ảnh | labels=${stats.train_labels+stats.val_labels+stats.test_labels} | no_label=${stats.no_label} → upload vào tab Model 1 để train.`;
         } catch (err) {
           resultEl.textContent = `Lỗi: ${err.message}`;
         }
@@ -2594,11 +2652,10 @@ names:
       function _buildMappingRows(classes) {
         const container = document.getElementById("mappingRows");
         container.innerHTML = "";
-        const targets = ["TRASH", "WATER", "SMOKE", "SKIP"];
+        const targets = ["TRASH", "WATER", "SKIP"];
         const CLASS_COLORS = {
           TRASH: "#059669",
           WATER: "#1d4ed8",
-          SMOKE: "#7e22ce",
           SKIP: "#94a3b8",
         };
         Object.entries(classes).forEach(([id, name]) => {
@@ -2619,8 +2676,6 @@ names:
             autoTarget = "TRASH";
           } else if (n.includes("water") || n.includes("sewage") || n.includes("effluent") || n.includes("oil") || n.includes("foam") || n.includes("river") || n.includes("pond") || n.includes("lake") || n.includes("drain")) {
             autoTarget = "WATER";
-          } else if (n.includes("smoke") || n.includes("smog") || n.includes("fire") || n.includes("dust") || n.includes("plume") || n.includes("haze") || n.includes("emission") || n.includes("air")) {
-            autoTarget = "SMOKE";
           }
 
           targets.forEach(t => {
@@ -2922,87 +2977,97 @@ names:
         });
       })();
 
-      // ===== MERGE DATASET =====
+      // ===== TRASH SUBTYPE (merge + train) =====
       (function () {
-        // Cache preview data per slot để không re-upload khi đổi class
-        const _previewCache = {};   // idx -> { file_name, data }
+        const listEl = document.getElementById("subtypeZipClassList");
+        const zipInput = document.getElementById("subtypeZipInput");
+        const countEl = document.getElementById("subtypeZipCount");
+        /** @type {{ id: string, file: File, class: string }[]} */
+        let subtypeZipQueue = [];
+        let subtypeZipIdSeq = 0;
 
-        // Cập nhật summary bar từ cache
-        function updateSummaryBar() {
-          const imgCounts = { TRASH: 0, WATER: 0, SMOKE: 0 };
-          for (let i = 0; i < 3; i++) {
-            const f = document.getElementById(`mergeZip${i}`).files[0];
-            const cls = document.getElementById(`mergeClass${i}`).value;
-            const cached = _previewCache[i];
-            if (f && cached) {
-              imgCounts[cls] = (imgCounts[cls] || 0) + (cached.image_count || 0);
-            } else if (f) {
-              imgCounts[cls] = (imgCounts[cls] || 0) + 1; // placeholder
-            }
-          }
-          document.getElementById("mergeSumTrashVal").textContent = imgCounts.TRASH > 0 ? imgCounts.TRASH : "—";
-          document.getElementById("mergeSumWaterVal").textContent = imgCounts.WATER > 0 ? imgCounts.WATER : "—";
-          document.getElementById("mergeSumSmokeVal").textContent = imgCounts.SMOKE > 0 ? imgCounts.SMOKE : "—";
-        }
-
-        function renderPreview(idx, data) {
-          const cls = document.getElementById(`mergeClass${idx}`).value;
-          const clsId = { TRASH: 0, WATER: 1, SMOKE: 2 }[cls];
-          const previewBox  = document.getElementById(`mergePreview${idx}`);
-          const previewText = document.getElementById(`mergePreviewText${idx}`);
-          const previewStats = document.getElementById(`mergePreviewStats${idx}`);
-
-          previewBox.style.display = "";
-
-          // Highlight OBB warning
-          const isOBB = data.label_format === "OBB";
-          const fmtColor = isOBB ? "#fbbf24" : "#86efac";
-
-          // Re-remap sample lines theo class hiện tại
-          const remapped = (data.sample_lines || []).map(line => {
-            const parts = line.trim().split(/\s+/);
-            if (parts.length >= 5) parts[0] = String(clsId);
-            return parts.join(" ");
-          });
-
-          previewText.style.color = fmtColor;
-          previewText.textContent = remapped.length > 0
-            ? remapped.join("\n")
-            : "(không có sample label)";
-
-          previewStats.innerHTML =
-            `<span style="color:${fmtColor}">${data.format_note}</span><br/>` +
-            `${data.image_count} ảnh · ${data.label_count} labels · → class_id=${clsId} (${cls})`;
-        }
-
-        // Handler khi chọn file — gọi API server để đọc
-        window.onMergeZipChange = async function(idx) {
-          const input    = document.getElementById(`mergeZip${idx}`);
-          const previewBox  = document.getElementById(`mergePreview${idx}`);
-          const previewText = document.getElementById(`mergePreviewText${idx}`);
-          const previewStats = document.getElementById(`mergePreviewStats${idx}`);
-          const f = input.files[0];
-
-          if (!f) {
-            previewBox.style.display = "none";
-            delete _previewCache[idx];
-            updateSummaryBar();
+        function renderSubtypeZipRows() {
+          countEl.textContent = `${subtypeZipQueue.length} tệp ZIP`;
+          if (subtypeZipQueue.length === 0) {
+            listEl.innerHTML = `<p style="margin:0;font-size:0.82rem;color:var(--muted)">Chưa có ZIP — chọn file ở ô «Thêm file ZIP» phía trên.</p>`;
             return;
           }
+          let html = `<table style="width:100%;font-size:0.82rem;border-collapse:collapse">`;
+          html += `<tr><th style="text-align:left;padding:0.35rem">Tệp ZIP</th><th style="text-align:left;padding:0.35rem">Loại rác</th><th style="width:4rem;padding:0.35rem">Xóa</th></tr>`;
+          for (const entry of subtypeZipQueue) {
+            const selected = _SUBTYPE_CLASSES.map(
+              (c) => `<option value="${c}"${c === entry.class ? " selected" : ""}>${_subtypeClassOption(c)}</option>`
+            ).join("");
+            html += `<tr data-subtype-id="${entry.id}">`;
+            html += `<td style="padding:0.35rem;word-break:break-all">${entry.file.name}</td>`;
+            html += `<td style="padding:0.35rem"><select class="subtype-class-pick" data-id="${entry.id}" style="width:100%;padding:0.35rem">${selected}</select></td>`;
+            html += `<td style="padding:0.35rem;text-align:center"><button type="button" class="subtype-remove-zip secondary" data-id="${entry.id}" title="Xóa ZIP này" style="font-size:0.75rem;padding:0.25rem 0.45rem">✕</button></td>`;
+            html += `</tr>`;
+          }
+          html += `</table>`;
+          listEl.innerHTML = html;
 
-          // Hiện loading
-          previewBox.style.display = "";
-          previewText.style.color = "#86efac";
-          previewText.textContent = "Đang đọc ZIP…";
-          previewStats.textContent = "";
+          listEl.querySelectorAll(".subtype-class-pick").forEach((sel) => {
+            sel.addEventListener("change", () => {
+              const id = sel.getAttribute("data-id");
+              const item = subtypeZipQueue.find((e) => e.id === id);
+              if (item) item.class = sel.value;
+            });
+          });
+          listEl.querySelectorAll(".subtype-remove-zip").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-id");
+              subtypeZipQueue = subtypeZipQueue.filter((e) => e.id !== id);
+              renderSubtypeZipRows();
+            });
+          });
+        }
 
-          const cls = document.getElementById(`mergeClass${idx}`).value;
+        zipInput.addEventListener("change", () => {
+          const picked = zipInput.files;
+          if (!picked || picked.length === 0) return;
+          for (let i = 0; i < picked.length; i++) {
+            subtypeZipQueue.push({
+              id: `sz_${++subtypeZipIdSeq}`,
+              file: picked[i],
+              class: "HOUSEHOLD",
+            });
+          }
+          zipInput.value = "";
+          renderSubtypeZipRows();
+        });
+
+        document.getElementById("subtypeClearAllZips").onclick = () => {
+          subtypeZipQueue = [];
+          zipInput.value = "";
+          renderSubtypeZipRows();
+        };
+
+        renderSubtypeZipRows();
+
+        document.getElementById("subtypeMergeBtn").onclick = async () => {
+          const resultEl = document.getElementById("subtypeMergeResult");
+          if (subtypeZipQueue.length === 0) {
+            resultEl.textContent = "Chọn ít nhất 1 file ZIP.";
+            return;
+          }
+          listEl.querySelectorAll(".subtype-class-pick").forEach((sel) => {
+            const id = sel.getAttribute("data-id");
+            const item = subtypeZipQueue.find((e) => e.id === id);
+            if (item) item.class = sel.value;
+          });
           const form = new FormData();
-          form.append("dataset_zip", f, f.name);
-          form.append("target_class", cls);
+          const classes = subtypeZipQueue.map((e) => e.class);
+          for (const entry of subtypeZipQueue) {
+            form.append("zips", entry.file, entry.file.name);
+          }
+          form.append("classes_json", JSON.stringify(classes));
+          form.append("val_fraction", String(Number(document.getElementById("subtypeValFraction").value) || 0.15));
+          form.append("also_register", document.getElementById("subtypeAlsoRegister").checked ? "true" : "false");
 
+          resultEl.textContent = "Đang gộp…";
           try {
-            const resp = await fetch("/api/v1/training/datasets/preview-labels", {
+            const resp = await fetch("/api/v1/training/subtype/datasets/merge-zips", {
               method: "POST",
               body: form,
             });
@@ -3010,53 +3075,318 @@ names:
               const err = await resp.json().catch(() => ({}));
               throw new Error(err.detail || `HTTP ${resp.status}`);
             }
-            const data = await resp.json();
-            _previewCache[idx] = data;
-            renderPreview(idx, data);
-          } catch (err) {
-            previewText.style.color = "#f87171";
-            previewText.textContent = `Lỗi đọc: ${err.message}`;
-            previewStats.textContent = "";
-          }
+            const statsRaw = resp.headers.get("X-Stats");
+            const stats = statsRaw ? JSON.parse(statsRaw) : {};
+            const dsId = resp.headers.get("X-Dataset-Id");
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "trash_subtype_merged.zip";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
 
-          updateSummaryBar();
+            const tc = stats.train_class_counts || {};
+            const vc = stats.val_class_counts || {};
+            let summary = `✅ Đã tải <code>trash_subtype_merged.zip</code><br/>`;
+            summary += `Tổng: <strong>${stats.total_train}</strong> ảnh train · <strong>${stats.total_val}</strong> ảnh val<br/>`;
+            _SUBTYPE_CLASSES.forEach((c) => {
+              if ((tc[c] || 0) + (vc[c] || 0) > 0) {
+                summary += `${_subtypeClassOption(c)}: train ${tc[c] || 0} · val ${vc[c] || 0}<br/>`;
+              }
+            });
+            if (dsId) {
+              document.getElementById("subtypeDatasetId").value = dsId;
+              summary += `<br/>Mã dataset: <code>${dsId}</code> — xuống bước 3 bấm «Bắt đầu huấn luyện».`;
+            } else {
+              summary += `<br/>Chưa lưu trên server — tải ZIP lên lại ở bước 2 nếu cần train tại đây.`;
+            }
+            resultEl.innerHTML = summary;
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          }
         };
 
-        // Khi đổi class dropdown — re-render từ cache (không upload lại)
-        for (let i = 0; i < 3; i++) {
-          document.getElementById(`mergeClass${i}`).addEventListener("change", () => {
-            const cached = _previewCache[i];
-            if (cached) renderPreview(i, cached);
-            updateSummaryBar();
-          });
+        document.getElementById("subtypeUploadBtn").onclick = async () => {
+          const f = document.getElementById("subtypeDatasetZip").files[0];
+          const resultEl = document.getElementById("subtypeDatasetResult");
+          if (!f) {
+            resultEl.textContent = "Chọn file ZIP.";
+            return;
+          }
+          const form = new FormData();
+          form.append("dataset_zip", f, f.name);
+          resultEl.textContent = "Đang upload…";
+          try {
+            const resp = await fetch("/api/v1/training/subtype/datasets/upload", { method: "POST", body: form });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            document.getElementById("subtypeDatasetId").value = data.dataset_id;
+            const s = data.summary || {};
+            const trainLines = Object.entries(s.train_class_counts || {})
+              .filter(([, n]) => n > 0)
+              .map(([k, n]) => `${_subtypeClassOption(k)}: ${n} ảnh train`)
+              .join("<br/>");
+            resultEl.innerHTML =
+              `✅ Mã dataset: <code>${data.dataset_id}</code><br/>` +
+              `<strong>${s.total_train_images}</strong> ảnh train · <strong>${s.total_val_images}</strong> ảnh val<br/>` +
+              (trainLines ? `${trainLines}` : "");
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          }
+        };
+
+        let subtypeActiveJobId = "";
+        let subtypeLogOffset = 0;
+        let subtypePollHandle = null;
+        const subtypeStopBtn = document.getElementById("subtypeStopBtn");
+
+        subtypeStopBtn.onclick = async () => {
+          const resultEl = document.getElementById("subtypeJobResult");
+          if (!subtypeActiveJobId) return;
+          resultEl.textContent = "Đang dừng job…";
+          try {
+            const resp = await fetch(
+              `/api/v1/training/subtype/jobs/${subtypeActiveJobId}/stop`,
+              { method: "POST" }
+            );
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            const statusEl = document.getElementById("subtypeJobStatus");
+            setStatusPill(statusEl, data.status);
+            statusEl.textContent = _subtypeStatusVi(data.status);
+            resultEl.textContent = `Đã dừng: ${data.error_text || _subtypeStatusVi(data.status)}`;
+            subtypeStopBtn.style.display = "none";
+            if (subtypePollHandle) {
+              window.clearInterval(subtypePollHandle);
+              subtypePollHandle = null;
+            }
+          } catch (err) {
+            resultEl.textContent = `Lỗi dừng job: ${err.message}`;
+          }
+        };
+
+        document.getElementById("subtypeStartBtn").onclick = async () => {
+          const resultEl = document.getElementById("subtypeJobResult");
+          const body = {
+            dataset_id: document.getElementById("subtypeDatasetId").value.trim(),
+            run_name: document.getElementById("subtypeRunName").value.trim() || "trash_subtype_classifier",
+            epochs: Number(document.getElementById("subtypeEpochs").value),
+            batch: Number(document.getElementById("subtypeBatch").value),
+            lr: Number(document.getElementById("subtypeLr").value),
+            output_path: document.getElementById("subtypeOutputPath").value.trim() || null,
+          };
+          if (!body.dataset_id) {
+            resultEl.textContent = "Cần mã dataset (gộp + tick lưu server, hoặc tải lên ở bước 2).";
+            return;
+          }
+          resultEl.textContent = "Đang tạo job huấn luyện…";
+          try {
+            const resp = await fetch("/api/v1/training/subtype/jobs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            subtypeActiveJobId = data.job_id;
+            document.getElementById("subtypeCurrentJob").textContent = subtypeActiveJobId;
+            const statusEl = document.getElementById("subtypeJobStatus");
+            setStatusPill(statusEl, data.status);
+            statusEl.textContent = _subtypeStatusVi(data.status);
+            subtypeLogOffset = 0;
+            document.getElementById("subtypeLogBox").textContent = "";
+            resultEl.textContent = `Job ${subtypeActiveJobId} — ${_subtypeStatusVi(data.status)}`;
+            subtypeStopBtn.style.display = "";
+            if (subtypePollHandle) window.clearInterval(subtypePollHandle);
+            subtypePollHandle = window.setInterval(async () => {
+              if (!subtypeActiveJobId) return;
+              try {
+                const [jobResp, logResp] = await Promise.all([
+                  fetch(`/api/v1/training/subtype/jobs/${subtypeActiveJobId}`),
+                  fetch(`/api/v1/training/subtype/jobs/${subtypeActiveJobId}/logs?offset=${subtypeLogOffset}&limit=4000`),
+                ]);
+                const job = await jobResp.json();
+                const log = await logResp.json();
+                const statusEl = document.getElementById("subtypeJobStatus");
+                setStatusPill(statusEl, job.status);
+                statusEl.textContent = _subtypeStatusVi(job.status);
+                if (log.content) {
+                  document.getElementById("subtypeLogBox").textContent += log.content;
+                  document.getElementById("subtypeLogBox").scrollTop =
+                    document.getElementById("subtypeLogBox").scrollHeight;
+                }
+                subtypeLogOffset = log.next_offset || subtypeLogOffset;
+                if (job.status === "SUCCEEDED" || job.status === "FAILED") {
+                  const msg = job.status === "SUCCEEDED"
+                    ? "Huấn luyện xong."
+                    : (job.error_text || "Huấn luyện thất bại.");
+                  resultEl.textContent = `${_subtypeStatusVi(job.status)}: ${msg}`;
+                  if (job.result?.output_path) {
+                    document.getElementById("subtypeResultPath").textContent =
+                      "File weights: " + job.result.output_path;
+                  }
+                  subtypeStopBtn.style.display = "none";
+                  window.clearInterval(subtypePollHandle);
+                  subtypePollHandle = null;
+                }
+              } catch (err) {
+                resultEl.textContent = `Poll lỗi: ${err.message}`;
+              }
+            }, 2000);
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          }
+        };
+      })();
+
+      // ===== MERGE DATASET (multi-ZIP queue) =====
+      (function () {
+        const listEl = document.getElementById("mergeZipClassList");
+        const zipInput = document.getElementById("mergeZipInput");
+        const countEl = document.getElementById("mergeZipCount");
+        /** @type {{ id: string, file: File, class: string, preview?: object }[]} */
+        let mergeZipQueue = [];
+        let mergeZipIdSeq = 0;
+
+        const _MERGE_CLASS_OPTIONS = [
+          ["TRASH", "🗑️ TRASH — Rác thải"],
+          ["WATER", "💧 WATER — Ô nhiễm nước"],
+        ];
+
+        function updateSummaryBar() {
+          const imgCounts = { TRASH: 0, WATER: 0 };
+          for (const entry of mergeZipQueue) {
+            const n = entry.preview?.image_count ?? 1;
+            imgCounts[entry.class] = (imgCounts[entry.class] || 0) + n;
+          }
+          document.getElementById("mergeSumTrashVal").textContent = imgCounts.TRASH > 0 ? imgCounts.TRASH : "—";
+          document.getElementById("mergeSumWaterVal").textContent = imgCounts.WATER > 0 ? imgCounts.WATER : "—";
         }
 
-        // Merge & Download
+        async function fetchPreview(entry) {
+          const form = new FormData();
+          form.append("dataset_zip", entry.file, entry.file.name);
+          form.append("target_class", entry.class);
+          try {
+            const resp = await fetch("/api/v1/training/datasets/preview-labels", {
+              method: "POST",
+              body: form,
+            });
+            if (!resp.ok) return null;
+            return await resp.json();
+          } catch {
+            return null;
+          }
+        }
+
+        function renderMergeZipRows() {
+          countEl.textContent = `${mergeZipQueue.length} tệp ZIP`;
+          if (mergeZipQueue.length === 0) {
+            listEl.innerHTML = `<p style="margin:0;font-size:0.82rem;color:var(--muted)">Chưa có ZIP — chọn file ở ô «Thêm file ZIP» phía trên.</p>`;
+            updateSummaryBar();
+            return;
+          }
+          let html = `<table style="width:100%;font-size:0.82rem;border-collapse:collapse">`;
+          html += `<tr><th style="text-align:left;padding:0.35rem">Tệp ZIP</th><th style="text-align:left;padding:0.35rem">Class target</th><th style="text-align:left;padding:0.35rem">Preview</th><th style="width:4rem;padding:0.35rem">Xóa</th></tr>`;
+          for (const entry of mergeZipQueue) {
+            const selected = _MERGE_CLASS_OPTIONS.map(
+              ([val, label]) => `<option value="${val}"${val === entry.class ? " selected" : ""}>${label}</option>`
+            ).join("");
+            const prev = entry.preview;
+            let previewCell = `<span style="color:var(--muted)">…</span>`;
+            if (prev) {
+              const fmt = prev.label_format === "OBB" ? "OBB→AABB" : "YOLO";
+              previewCell = `<span style="font-family:var(--font-mono);font-size:0.72rem">${prev.image_count} ảnh · ${fmt}</span>`;
+            }
+            html += `<tr data-merge-id="${entry.id}">`;
+            html += `<td style="padding:0.35rem;word-break:break-all">${entry.file.name}</td>`;
+            html += `<td style="padding:0.35rem"><select class="merge-class-pick" data-id="${entry.id}" style="width:100%;padding:0.35rem">${selected}</select></td>`;
+            html += `<td style="padding:0.35rem">${previewCell}</td>`;
+            html += `<td style="padding:0.35rem;text-align:center"><button type="button" class="merge-remove-zip secondary" data-id="${entry.id}" title="Xóa ZIP này" style="font-size:0.75rem;padding:0.25rem 0.45rem">✕</button></td>`;
+            html += `</tr>`;
+          }
+          html += `</table>`;
+          listEl.innerHTML = html;
+
+          listEl.querySelectorAll(".merge-class-pick").forEach((sel) => {
+            sel.addEventListener("change", async () => {
+              const id = sel.getAttribute("data-id");
+              const item = mergeZipQueue.find((e) => e.id === id);
+              if (!item) return;
+              item.class = sel.value;
+              item.preview = await fetchPreview(item);
+              renderMergeZipRows();
+            });
+          });
+          listEl.querySelectorAll(".merge-remove-zip").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-id");
+              mergeZipQueue = mergeZipQueue.filter((e) => e.id !== id);
+              renderMergeZipRows();
+            });
+          });
+          updateSummaryBar();
+        }
+
+        zipInput.addEventListener("change", async () => {
+          const picked = zipInput.files;
+          if (!picked || picked.length === 0) return;
+          const newEntries = [];
+          for (let i = 0; i < picked.length; i++) {
+            newEntries.push({
+              id: `mz_${++mergeZipIdSeq}`,
+              file: picked[i],
+              class: "WATER",
+              preview: null,
+            });
+          }
+          zipInput.value = "";
+          mergeZipQueue = mergeZipQueue.concat(newEntries);
+          renderMergeZipRows();
+          for (const entry of newEntries) {
+            entry.preview = await fetchPreview(entry);
+          }
+          renderMergeZipRows();
+        });
+
+        document.getElementById("mergeClearAllZips").onclick = () => {
+          mergeZipQueue = [];
+          zipInput.value = "";
+          renderMergeZipRows();
+        };
+
+        renderMergeZipRows();
+
         document.getElementById("mergeRunBtn").addEventListener("click", async () => {
           const resultBox = document.getElementById("mergeResultBox");
           resultBox.style.display = "";
           resultBox.style.background = "rgba(248,250,252,0.95)";
           resultBox.style.color = "var(--text)";
+
+          if (mergeZipQueue.length === 0) {
+            resultBox.style.background = "#fef2f2";
+            resultBox.style.color = "#b91c1c";
+            resultBox.textContent = "Chọn ít nhất 1 file ZIP.";
+            return;
+          }
+
+          listEl.querySelectorAll(".merge-class-pick").forEach((sel) => {
+            const id = sel.getAttribute("data-id");
+            const item = mergeZipQueue.find((e) => e.id === id);
+            if (item) item.class = sel.value;
+          });
+
           resultBox.textContent = "Đang gộp dataset…";
 
           const form = new FormData();
-          let slotCount = 0;
-
-          for (let i = 0; i < 3; i++) {
-            const f = document.getElementById(`mergeZip${i}`).files[0];
-            const cls = document.getElementById(`mergeClass${i}`).value;
-            if (!f) continue;
-            form.append(`zip_${i}`, f, f.name);
-            form.append(`class_${i}`, cls);
-            slotCount++;
+          const classes = mergeZipQueue.map((e) => e.class);
+          for (const entry of mergeZipQueue) {
+            form.append("zips", entry.file, entry.file.name);
           }
-
-          if (slotCount < 2) {
-            resultBox.style.background = "#fef2f2";
-            resultBox.style.color = "#b91c1c";
-            resultBox.textContent = "Cần ít nhất 2 slot ZIP để gộp.";
-            return;
-          }
+          form.append("classes_json", JSON.stringify(classes));
 
           try {
             const resp = await fetch("/api/v1/training/datasets/merge-zips", {
@@ -3081,19 +3411,19 @@ names:
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            // Build result summary
             const cc = stats.class_counts ?? {};
-            const slotSummary = (stats.slots || []).map(s =>
-              `  ${s.target_class} (id=${s.class_id}): ${s.images} ảnh · ${s.labels} labels`
-            ).join("\n");
+            const slotLines = (stats.slots || [])
+              .map((s) => `${s.target_class}: ${s.images} ảnh`)
+              .join(" · ");
 
             resultBox.style.background = "#ecfdf5";
             resultBox.style.color = "#047857";
             resultBox.innerHTML =
               `<strong>✅ Download xong: merged_dataset.zip</strong><br/>` +
               `<span style="font-family:var(--font-mono);font-size:0.78rem">` +
-              `Tổng: ${stats.total_images} ảnh · ${stats.total_labels} labels<br/>` +
-              `TRASH (id=0): ${cc["0"] ?? 0} bbox · WATER (id=1): ${cc["1"] ?? 0} bbox · SMOKE (id=2): ${cc["2"] ?? 0} bbox` +
+              `${mergeZipQueue.length} ZIP gộp · Tổng: ${stats.total_images} ảnh · train=${stats.train_images} / val=${stats.val_images} / test=${stats.test_images} (70/15/15)<br/>` +
+              `${slotLines}<br/>` +
+              `TRASH bbox: ${cc["0"] ?? 0} · WATER bbox: ${cc["1"] ?? 0}` +
               `</span><br/><br/>` +
               `<span style="font-size:0.8rem;color:#047857">👉 Vào tab <strong>🎯 YOLO — Pollution</strong> → Upload ZIP → Start training</span>`;
           } catch (err) {
@@ -3102,9 +3432,6 @@ names:
             resultBox.textContent = `Lỗi: ${err.message}`;
           }
         });
-
-        // Init
-        updateSummaryBar();
       })();
     </script>
   </body>

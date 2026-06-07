@@ -63,6 +63,10 @@ class Settings(BaseSettings):
     scene_classifier_version: str = ""  # BR-AI-005 audit label when scene weights are loaded
     scene_classifier_threshold: float = 0.45
 
+    # Trash subtype classifier (EfficientNet-B0) — empty string disables it
+    trash_subtype_model_path: str = ""
+    trash_subtype_threshold: float = 0.40  # min confidence to report a subtype (vs UNKNOWN)
+
 
 @lru_cache
 def get_settings() -> Settings:

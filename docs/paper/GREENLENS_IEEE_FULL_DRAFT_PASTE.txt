@@ -1,0 +1,239 @@
+GREENLENS AI: A Multi-Class Environmental Pollution Detection System for Vietnamese Urban Contexts Using Hybrid YOLO and Scene Classification
+
+Abstract
+Vấn đề: thiếu hệ thống giám sát ô nhiễm tự động đa lớp tại Việt Nam trong khi các bộ dữ liệu và mô hình hiện có chủ yếu được xây dựng cho bối cảnh phương Tây. Phương pháp: kiến trúc lai (hybrid) kết hợp YOLOv8n cho phát hiện đối tượng, hai mô-đun EfficientNet-B0 cho phân loại cảnh quan (WATER/SMOKE) và phân loại chi tiết loại rác (bảy lớp con trên vùng cắt TRASH), có cơ chế fusion với safeguard nhằm giảm dương tính giả; fine-tune theo chiến lược hai pha trên dữ liệu toàn cầu và 500 ảnh Việt Nam. Kết quả: trên tập kiểm thử phát hiện ô nhiễm, mAP@0.5 đạt [TBD_mAP50] (baseline YOLO-only: [TBD_baseline]); phân loại loại rác đạt macro-F1 [TBD_macroF1] (chi tiết theo Bảng IV). Ý nghĩa: nền tảng citizen reporting có thông tin vận hành (loại rác cụ thể) phục vụ thu gom và xử lý tại đô thị Việt Nam.
+
+Keywords: Object Detection, Scene Classification, Fine-Grained Waste Classification, Environmental Monitoring, YOLOv8, EfficientNet, Two-Stage Pipeline, Domain Adaptation, Vietnamese Dataset.
+
+1. Giới thiệu
+
+1.1 Bối cảnh
+Ô nhiễm môi trường tại Việt Nam đang trở thành vấn đề cấp bách, đặc biệt tại các đô thị lớn như Hà Nội và Thành phố Hồ Chí Minh. Theo Bộ Tài nguyên và Môi trường (MoNRE), nhiều khu vực ghi nhận nồng độ bụi mịn PM2.5 vượt giới hạn cho phép của QCVN 05:2023/BTNMT, trong đó một số trạm quan trắc tại khu vực miền Nam ghi nhận giá trị PM2.5 trung bình 24 giờ vượt chuẩn nhiều lần trong năm 2024 [1]. Bên cạnh đó, Quy hoạch tổng thể quan trắc môi trường quốc gia giai đoạn 2021–2030 cho biết đến năm 2030 sẽ duy trì 19 trạm quan trắc chất lượng không khí tự động và bổ sung thêm 31 trạm quan trắc môi trường không khí nhằm tăng cường giám sát chất lượng môi trường [2]. Đồng thời, các chương trình điều tra hiện trạng chất thải nhựa [3] và giám sát ô nhiễm nguồn nước [4] đang được triển khai nhằm phục vụ công tác quản lý, cảnh báo và bảo vệ môi trường tại Việt Nam.
+
+Tuy nhiên, hệ thống quan trắc dựa trên trạm cố định chỉ cung cấp dữ liệu cảm biến điểm (sensor-based point data) và không thể ghi nhận các sự kiện ô nhiễm trực quan như đổ trộm rác, xả thải nước hay khói thải công nghiệp xảy ra ngoài phạm vi trạm. Khoảng trống này thúc đẩy nhu cầu phát triển các hệ thống giám sát bằng hình ảnh (image-based monitoring) có khả năng mở rộng nhờ sự tham gia của cộng đồng.
+
+1.2 Các tiếp cận hiện tại trong giám sát ô nhiễm bằng thị giác máy tính
+Trong những năm gần đây, deep learning đã được ứng dụng rộng rãi cho ba bài toán liên quan đến ô nhiễm môi trường: phát hiện rác thải, nhận diện ô nhiễm nước và phát hiện khói thải.
+
+Phát hiện rác thải (Trash detection). Các công trình tiên phong như TACO [9] và TrashNet [16] đã xây dựng những bộ dữ liệu nền tảng cho bài toán nhận diện rác thải đô thị. Trên cơ sở đó, các họ mô hình một giai đoạn (single-stage) như SSD [6] và YOLO [7] cũng như hai giai đoạn (two-stage) như Faster R-CNN [5] đã được áp dụng và đạt nhiều kết quả khả quan. Majchrowska và cộng sự [17] tổng hợp hơn mười bộ dữ liệu rác thải công khai thành benchmark detect-waste và classify-waste, đồng thời chỉ ra rằng phần lớn các bộ dữ liệu hiện có được thu thập tại châu Âu, Bắc Mỹ và một số nước phát triển, dẫn đến hạn chế đơn miền (single-domain limitation) khi triển khai ở các bối cảnh khác.
+
+Phân loại chi tiết loại rác (Fine-grained waste classification). TrashNet [16] và các bộ dữ liệu phân loại vật liệu (plastic, glass, metal, paper) tập trung vào tái chế, trong khi TACO [9] gắn nhãn theo ngữ cảnh đô thị. Các benchmark classify-waste [17] thường tách rời khỏi pipeline phát hiện đa ô nhiễm (nước, khói). Huấn luyện một detector đa subclass với bbox cho từng loại rác đòi hỏi khối lượng gán nhãn lớn; tiếp cận hai giai đoạn (detect rồi classify trên crop) giảm chi phí annotation và phù hợp triển khai API lấy mẫu theo từng vùng rác.
+
+Nhận diện ô nhiễm nước (Water pollution recognition). Khác với rác thải, ô nhiễm nguồn nước thường biểu hiện dưới dạng đặc trưng cảnh quan — màu sắc bất thường, độ đục, váng dầu — khó biểu diễn bằng bounding box truyền thống. Các nghiên cứu gần đây [18], [19] do đó sử dụng tiếp cận phân loại cấp cảnh (scene-level classification) dựa trên CNN (ví dụ AlexNet, ResNet, EfficientNet) để phân loại tình trạng nước. Tuy nhiên, các classifier scene-level độc lập có xu hướng dương tính giả cao (false positive) khi gặp các cảnh có màu sắc tương tự nhưng không phải nước (ví dụ: vỉa hè ướt, vũng dầu trên đường), do thiếu cơ chế xác nhận sự hiện diện của bối cảnh có liên quan.
+
+Phát hiện khói thải (Smoke detection). Tương tự như ô nhiễm nước, khói thải có đặc trưng phân tán, không có biên rõ ràng, gây khó khăn cho object detection thuần túy. Project RISE [20] và DeepSmoke [21] đã đề xuất các kiến trúc CNN chuyên biệt cho phân loại khói, song chỉ tập trung vào một loại ô nhiễm duy nhất và chưa được tích hợp vào hệ thống đa lớp (multi-class).
+
+AI cho môi trường tại Việt Nam. Các nghiên cứu hiện có chủ yếu tập trung vào dự đoán chất lượng không khí từ dữ liệu cảm biến [15] hoặc dự báo lượng chất thải rắn sinh hoạt từ dữ liệu thống kê [22]. Trong lĩnh vực thị giác máy tính, pLitterStreet [23] — bộ dữ liệu rác đường phố được thu thập tại Sri Lanka, Thái Lan và Việt Nam — là một trong số ít công trình có dữ liệu ảnh từ Việt Nam, nhưng chỉ tập trung vào rác thải đường phố thu thập từ camera gắn trên xe và không bao gồm các loại ô nhiễm khác như nước, khói.
+
+1.3 Các khoảng trống nghiên cứu
+Từ phân tích các công trình liên quan, chúng tôi xác định năm khoảng trống chính mà nghiên cứu này hướng đến giải quyết:
+
+Gap 1 — Khoảng trống dữ liệu (Dataset gap). Mặc dù đã có nhiều bộ dữ liệu công khai cho rác thải [9], [16], [17], chưa có bộ dữ liệu nào tổng hợp đồng thời ba loại ô nhiễm phổ biến trong đô thị (rác thải, ô nhiễm nước, khói thải) trong cùng một định dạng gán nhãn thống nhất. Ngoài ra, dữ liệu ảnh ô nhiễm cho bối cảnh đô thị Việt Nam còn rất hạn chế.
+
+Gap 2 — Khoảng trống phương pháp (Methodological gap). Hầu hết các nghiên cứu hiện có sử dụng một kiến trúc duy nhất — hoặc object detection [9], hoặc scene classification [18] — cho mọi loại ô nhiễm. Các kiến trúc lai [24], [25] chưa được áp dụng đầy đủ cho giám sát ô nhiễm đa lớp kèm cơ chế safeguard chống false positive của scene classifier.
+
+Gap 3 — Khoảng trống thích ứng miền (Domain adaptation gap). Chưa có nghiên cứu định lượng mức đóng góp của dữ liệu nội địa Việt Nam đối với hiệu năng phát hiện ô nhiễm trong cùng pipeline triển khai.
+
+Gap 4 — Khoảng trống triển khai (Deployment gap). Ít hệ thống end-to-end (mobile + backend) với Human-in-the-Loop cho citizen reporting tại Việt Nam.
+
+Gap 5 — Khoảng trống phân loại chi tiết rác (Fine-grained waste gap). Hệ thống giám sát đa lớp hiện có thường dừng ở nhãn TRASH chung; thiếu thông tin loại rác (y tế, nguy hại, tái chế, v.v.) phục vụ điều phối thu gom và xử lý.
+
+1.4 Đóng góp của bài báo
+Đóng góp 1 (Gap 1) — Bộ dữ liệu ô nhiễm đa lớp. Bộ dữ liệu gồm [TBD_N_total] ảnh, ba lớp TRASH/WATER/SMOKE; trong đó 500 ảnh thu thập tại TP.HCM (26–28/05/2025). Phần còn lại chuẩn hóa từ [9], [16], [17], [20] theo định dạng YOLO.
+
+Đóng góp 2 (Gap 2) — Kiến trúc lai có safeguard. YOLOv8n [8] + EfficientNet-B0 scene [11] với fusion có ràng buộc: scene chỉ kích hoạt khi YOLO đã phát hiện đối tượng.
+
+Đóng góp 3 (Gap 3) — Thích ứng miền hai pha và ablation trên trục dữ liệu Việt Nam (500 ảnh).
+
+Đóng góp 4 (Gap 4) — Nguyên mẫu GreenLens: ứng dụng di động + FastAPI, severity bốn mức, Human-in-the-Loop ba chế độ (AUTO_FILL / SUGGEST / KEEP_USER_CHOICE).
+
+Đóng góp 5 (Gap 5) — Pipeline hai giai đoạn cho loại rác: sau khi YOLO định vị TRASH, EfficientNet-B0 thứ hai phân loại crop thành bảy lớp; gộp kết quả theo tần suất (subtypes). Hỗ trợ graceful degradation khi chưa có trọng số subtype.
+
+1.5 Cấu trúc bài báo
+Mục 2: công trình liên quan. Mục 3: dữ liệu (gồm 3.6 dữ liệu phân loại loại rác). Mục 4: phương pháp (gồm 4.6 mô-đun subtype). Mục 5: thực nghiệm (gồm 5.5 kết quả subtype). Mục 6–7: thảo luận và kết luận.
+
+2. Các công trình liên quan
+
+2.1 Phát hiện đối tượng cho giám sát môi trường
+Bài toán phát hiện rác thải và đối tượng ô nhiễm bằng deep learning đã được nghiên cứu rộng rãi. Trong nghiên cứu này, chúng tôi sử dụng YOLOv8n [8] do cân bằng tốc độ–độ chính xác và kích thước mô hình (~6 MB) phù hợp triển khai di động/edge.
+
+2.2 Phân loại cảnh và Transfer Learning
+EfficientNet-B0 [11] với transfer learning từ ImageNet [12] được dùng cho nhánh scene và nhánh subtype (hai head khác nhau, hai bộ trọng số).
+
+2.3 AI cho giám sát môi trường
+[Giữ nguyên nội dung hiện có trong bản gốc — mục 2.3, 2.4.]
+
+3. Bộ dữ liệu
+
+3.1 Chiến lược thu thập dữ liệu
+Phase 1 — Dữ liệu toàn cầu: tổng hợp từ Roboflow và các nguồn công khai, gồm [TBD_N_global] ảnh, ba lớp TRASH/WATER/SMOKE.
+
+Phase 2 — Dữ liệu Việt Nam: 500 ảnh tại TP.HCM, 26–28/05/2025, thiết bị di động.
+
+3.2 Thống kê bộ dữ liệu (phát hiện ô nhiễm — Bảng I)
+
+Bảng I. PHÂN BỐ ẢNH THEO LỚP Ô NHIỄM (YOLO)
+
+Lớp      | Global | Vietnamese | Total
+TRASH     | TBD    | TBD        | TBD
+WATER     | TBD    | TBD        | TBD
+SMOKE     | TBD    | TBD        | TBD
+TOTAL     | TBD    | 500        | TBD
+
+Ghi chú: điền TBD sau khi chốt thống kê; tổng Total = Global + Vietnamese (hoặc theo quy ước gộp của nhóm).
+
+3.3 Quy trình gán nhãn
+Ảnh ô nhiễm đa lớp được gán nhãn bounding box theo định dạng YOLO (class_id, tọa độ chuẩn hóa). Mỗi ảnh có thể chứa nhiều hộp; lớp TRASH gắn với vùng rác rời rạc, WATER/SMOKE theo hướng dẫn nhất quán trong nhóm annotator. Kiểm tra chéo [TBD_%] mẫu trên tập validation nhãn. Conflict được giải quyết bởi annotator cấp cao.
+
+3.4 Tăng cường dữ liệu (Data Augmentation)
+• Geometric: horizontal flip (p=0.5), rotation, random crop.
+• Photometric: HSV jitter (h=0.015, s=0.7, v=0.4).
+• Object-level (YOLO): Mosaic (p=1.0), MixUp (p=0.15), Copy-Paste (p=0.3).
+
+Subtype classifier (Mục 3.6): RandomHorizontalFlip, RandomRotation (±15°), ColorJitter, RandomResizedCrop; val/test chỉ resize + normalize ImageNet.
+
+3.5 Phân chia train/val/test
+Tỉ lệ 70/15/15, stratified theo lớp. Tập test khóa (locked) trước khi tune — chỉ báo cáo metric cuối một lần (chuẩn IEEE reproducibility).
+
+3.6 Bộ dữ liệu phân loại loại rác (Trash Subtype)
+Khác Stage 1: không cần bbox; cấu trúc ImageFolder images/{train|val|test}/{class}/.
+
+Bảy lớp (mã hóa trong hệ thống): RECYCLABLE, ORGANIC, MEDICAL, ELECTRONIC, CONSTRUCTION, HAZARDOUS, HOUSEHOLD.
+
+Nguồn: TACO [9], TrashNet [16], tập phân loại công khai (Kaggle/Roboflow), bổ sung ảnh tự thu tại Việt Nam (khẩu trang, công trình, chợ).
+
+Bảng II. MỤC TIÊU QUY MÔ DỮ LIỆU SUBTYPE (ĐIỀN SAU KHI GOM ẢNH)
+
+Lớp          | Train | Val | Test | Ghi chú
+RECYCLABLE    | TBD   | TBD | TBD  | Chai PET, lon, carton
+ORGANIC       | TBD   | TBD | TBD  | Thức ăn, rau củ
+MEDICAL       | TBD   | TBD | TBD  | Ưu tiên bối cảnh VN
+ELECTRONIC    | TBD   | TBD | TBD  | Thiết bị điện tử
+CONSTRUCTION  | TBD   | TBD | TBD  | Gạch, xi măng
+HAZARDOUS     | TBD   | TBD | TBD  | Pin, hóa chất
+HOUSEHOLD     | TBD   | TBD | TBD  | Rác sinh hoạt hỗn hợp
+TOTAL         | TBD   | TBD | TBD  | Mục tiêu ~2k–3k ảnh
+
+4. Phương pháp
+
+Hệ thống GreenLens nhận ảnh RGB; đầu ra: (i) lớp ô nhiễm chính, (ii) confidence, (iii) severity, (iv) gợi ý HITL, (v) subtypes (khi TRASH và mô hình subtype sẵn sàng).
+
+4.1 Tổng quan kiến trúc
+Năm thành phần: (1) YOLOv8n detection, (2) EfficientNet-B0 scene (WATER/SMOKE/NEGATIVE), (3) EfficientNet-B0 trash subtype trên crop TRASH, (4) fusion + safeguard, (5) severity từ coverage ratio.
+
+[Chèn Hình 1: sơ đồ pipeline — draw.io, tông xám/xanh, không màu rực rỡ.]
+
+4.2 Mô-đun phát hiện đối tượng — YOLOv8n
+Khởi tạo COCO [26]; fine-tune: epochs=150, imgsz=1280, batch=16, AdamW, lr=0.001, cosine schedule. YOLO authoritative cho TRASH.
+
+4.3 Mô-đun phân loại cảnh — EfficientNet-B0
+Đầu ra WATER, SMOKE, NEGATIVE; ngưỡng τ_scene = 0.45.
+
+4.4 Chiến lược hợp nhất (Fusion Strategy)
+• Quy tắc 1: TRASH ưu tiên YOLO khi vượt ngưỡng.
+• Quy tắc 2 (safeguard): Scene chỉ chạy khi YOLO đã phát hiện ≥1 đối tượng.
+• Quy tắc 3: Xung đột — WATER/SMOKE ưu tiên Scene.
+
+Bảng III. ÁNH XẠ CONFIDENCE → HÀNH VI UI
+
+Chế độ           | Ngưỡng confidence | Hành vi
+AUTO_FILL         | ≥ 0.80            | Tự động điền nhãn
+SUGGEST           | 0.50 – 0.80       | Gợi ý, người dùng xác nhận
+KEEP_USER_CHOICE  | < 0.50            | Ưu tiên người dùng
+
+4.5 Ước lượng mức độ nghiêm trọng
+Coverage ratio: tổng diện tích bbox / (H×W). Ánh xạ: <5% LOW; 5–15% MEDIUM; 15–40% HIGH; ≥40% CRITICAL.
+
+4.6 Mô-đun phân loại loại rác (Trash Subtype Classifier)
+Kích hoạt khi YOLO trả ≥1 bbox TRASH và trọng số subtype đã load.
+
+Với mỗi bbox: crop có padding 4 px → resize 224×224 → normalize ImageNet → EfficientNet-B0 → softmax 7 lớp. Ngưỡng τ_subtype = 0.40; dưới ngưỡng gán UNKNOWN.
+
+Gộp cấp ảnh: đếm subtype theo bbox; mỗi lớp lưu count và confidence cao nhất → trường subtypes trong API. Graceful degradation: không có file trọng số → trash_subtype_active = false, API vẫn trả TRASH + severity.
+
+Lý do hai giai đoạn: giảm yêu cầu bbox cho từng loại rác so với YOLO đa subclass; tách localization và fine-grained classification.
+
+5. Thực nghiệm
+
+5.1 Thiết lập thực nghiệm
+Phần cứng: [TBD_GPU, ví dụ NVIDIA T4 trên Kaggle]. Framework: PyTorch, Ultralytics YOLOv8. Backend suy luận: FastAPI. Seed: [TBD_seed] (ghi rõ để tái lập).
+
+5.2 Tiêu chí đánh giá
+Detection: Precision, Recall, mAP@0.5, mAP@0.5:0.95 (theo lớp và trung bình).
+Scene: accuracy, F1 trên WATER/SMOKE; báo cả false positive rate khi YOLO rỗng (safeguard).
+Subtype: top-1 accuracy, macro/micro Precision, Recall, F1; confusion matrix 7×7.
+Triển khai: kích thước file (MB), latency trung bình (ms/ảnh) trên [TBD_device].
+
+5.3 Kết quả phát hiện ô nhiễm (YOLO)
+Bảng IV. KẾT QUẢ YOLOv8n TRÊN TẬP TEST (ĐIỀN/HIỆU CHỈNH SAU KHI CHỐT TEST SET)
+
+Lớp   | Precision | Recall | mAP@0.5 | mAP@0.5:0.95
+SMOKE | TBD       | TBD    | TBD     | TBD
+TRASH | TBD       | TBD    | TBD     | TBD
+WATER | TBD       | TBD    | TBD     | TBD
+ALL   | TBD       | TBD    | TBD     | TBD
+
+Giá trị tham chiếu huấn luyện (validation, greenlens_v3_clean, 150 epochs): SMOKE P=0.712 R=0.842 mAP50=0.813; TRASH P=0.691 R=0.700 mAP50=0.737; WATER P=0.457 R=0.255 mAP50=0.242; ALL mAP50=0.597 — thay bằng số test chính thức trước khi nộp.
+
+So sánh baseline: (a) chỉ dữ liệu global, (b) global + 500 ảnh VN — ΔmAP ghi tại [TBD_delta].
+
+5.4 Nghiên cứu cắt bỏ (Ablation Study)
+5.4.1 Ảnh hưởng dữ liệu Việt Nam: Bảng V — mAP@0.5 với/không 500 ảnh VN [TBD].
+5.4.2 Ảnh hưởng Fusion: Scene độc lập vs hybrid + safeguard — FP rate [TBD].
+
+5.5 Kết quả phân loại loại rác (Subtype)
+Bảng VI. METRIC THEO LỚP SUBTYPE (TẬP TEST KHÓA)
+
+Lớp          | Precision | Recall | F1
+RECYCLABLE    | TBD       | TBD    | TBD
+ORGANIC       | TBD       | TBD    | TBD
+MEDICAL       | TBD       | TBD    | TBD
+ELECTRONIC    | TBD       | TBD    | TBD
+CONSTRUCTION  | TBD       | TBD    | TBD
+HAZARDOUS     | TBD       | TBD    | TBD
+HOUSEHOLD     | TBD       | TBD    | TBD
+Macro avg     | TBD       | TBD    | TBD
+
+[Hình 2: Confusion matrix 7×7 — chèn sau khi có kết quả.]
+
+5.6 Kết quả định tính
+Mô tả case thành công/thất bại trên ảnh VN; ví dụ phân biệt khẩu trang (MEDICAL) vs tái chế (RECYCLABLE).
+
+6. Thảo luận và Hạn chế
+
+6.1 Phân tích khoảng cách miền (Domain Gap)
+[TBD — thảo luận sau ablation 5.4.1.]
+
+6.2 Các trường hợp thất bại
+• Thiếu sáng / ban đêm.
+• Che khuất một phần (YOLO miss).
+• Đa ô nhiễm: primary_class một nhãn — mất thông tin lớp phụ.
+• Subtype: bbox chứa hỗn hợp nhiều loại rác → chỉ top-1; ORGANIC vs RECYCLABLE dễ nhầm; HOUSEHOLD chồng lấp RECYCLABLE/ORGANIC.
+
+6.3 Cân nhắc triển khai
+Tổng trọng số ~22 MB (YOLO + scene) + ~16 MB (subtype khi bật). Quantization INT8/TensorRT cho on-device.
+
+6.4 Hạn chế
+• 500 ảnh VN còn nhỏ.
+• Phạm vi địa lý chủ yếu TP.HCM.
+• Subtype: phụ thuộc chất lượng bbox YOLO; chưa xác thực severity bằng inter-annotator agreement.
+• Một số lớp subtype thiếu ảnh VN → cần bổ sung dataset.
+
+6.5 Hướng nghiên cứu tiếp theo
+Video/stream; multi-label subtype; mở rộng lớp CHEMICAL; self-supervised pretraining; mở dataset công khai.
+
+7. Kết luận
+GreenLens kết hợp YOLOv8n, EfficientNet-B0 scene có safeguard, và pipeline hai giai đoạn phân loại bảy loại rác trên vùng TRASH, hướng tới citizen reporting tại Việt Nam. Năm đóng góp tương ứng Gap 1–5. Kết quả định lượng: mAP@0.5 [TBD_mAP50], macro-F1 subtype [TBD_macroF1], latency [TBD_ms] — đủ cho triển khai API thời gian thực sau tối ưu.
+
+Acknowledgments
+[Lời cảm ơn — giữ nguyên bản gốc.]
+
+References
+[Giữ nguyên [1]–[26] trong bản gốc.]
+
+---
+HƯỚNG DẪN ĐIỀN TBD (tìm-thay trong Google Doc)
+TBD_N_total, TBD_N_global — tổng ảnh dataset YOLO
+TBD_mAP50, TBD_baseline, TBD_macroF1 — metric báo cáo
+TBD_* trong Bảng I, II, IV, V, VI — số liệu thực nghiệm
+Sau khi train subtype xong: thay giá trị validation ở 5.3 bằng test set locked

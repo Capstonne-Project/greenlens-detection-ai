@@ -11,8 +11,10 @@ from app.models.classify import (
     ClassifyRequest,
     ClassifyResponse,
     DetectedBox,
+    TrashSubtypePrediction,
 )
 from app.services import storage_service
+from app.utils.image_decode import HeifDecoderUnavailableError, normalize_classify_image_bytes
 from app.utils.logger import get_logger
 
 router = APIRouter(tags=["classification"])
@@ -32,6 +34,9 @@ def classify_image_bytes_to_response(image_bytes: bytes) -> ClassifyResponse:
             confidence=float(p["confidence"]),
             bbox_count=int(p["bbox_count"]),
             boxes=[DetectedBox(**b) for b in p.get("boxes", [])],
+            subtypes=(
+                [TrashSubtypePrediction(**s) for s in p["subtypes"]] if p.get("subtypes") else None
+            ),
         )
         for p in result.predictions
     ]
@@ -44,6 +49,7 @@ def classify_image_bytes_to_response(image_bytes: bytes) -> ClassifyResponse:
         model_version=result.model_version,
         yolo_active=result.yolo_active,
         scene_classifier_active=result.scene_classifier_active,
+        trash_subtype_active=result.trash_subtype_active,
         detector_model_version=result.detector_model_version,
         scene_model_version=result.scene_model_version,
         scene_scores=result.scene_scores,
@@ -132,6 +138,13 @@ async def classify_upload(
 
     if len(payload) > _MAX_CLASSIFY_BYTES:
         raise HTTPException(status_code=413, detail="Image too large.")
+
+    try:
+        payload = normalize_classify_image_bytes(payload, image.filename)
+    except HeifDecoderUnavailableError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     response = classify_image_bytes_to_response(payload)
 

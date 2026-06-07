@@ -13,6 +13,20 @@ class DetectedBox(BaseModel):
     x2: float
     y2: float
     confidence: float = Field(ge=0.0, le=1.0)
+    subtype: str | None = Field(
+        default=None, description="Trash subtype for this box (TRASH class only)."
+    )
+    subtype_confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class TrashSubtypePrediction(BaseModel):
+    """Aggregated trash subtype count across all boxes in one TRASH prediction."""
+
+    subtype: str
+    count: int = Field(ge=0, description="Number of boxes classified as this subtype.")
+    confidence: float = Field(
+        ge=0.0, le=1.0, description="Best confidence among boxes of this subtype."
+    )
 
 
 class ClassificationPrediction(BaseModel):
@@ -22,7 +36,7 @@ class ClassificationPrediction(BaseModel):
         ...,
         serialization_alias="class",
         description=(
-            "BR-REP-005 scene category: TRASH / WATER / SMOKE "
+            "BR-REP-005 scene category: TRASH / WATER "
             "(detector aggregates; tiếng ồn do user nhập)."
         ),
     )
@@ -37,6 +51,11 @@ class ClassificationPrediction(BaseModel):
     boxes: list[DetectedBox] = Field(
         default_factory=list,
         description="Tọa độ pixel (xyxy) của từng bounding box thuộc loại ô nhiễm này.",
+    )
+
+    subtypes: list[TrashSubtypePrediction] | None = Field(
+        default=None,
+        description="Trash subtype breakdown — only present when class=TRASH and subtype model is active.",
     )
 
 
@@ -90,6 +109,11 @@ class ClassifyResponse(BaseModel):
         description="True when scene classifier weights were loaded and ran for this request.",
     )
 
+    trash_subtype_active: bool = Field(
+        default=False,
+        description="True when trash subtype classifier was loaded and ran for this request.",
+    )
+
     detector_model_version: str | None = Field(
         default=None,
         description="MODEL_VERSION from settings when YOLO is active; null when YOLO is off.",
@@ -102,7 +126,7 @@ class ClassifyResponse(BaseModel):
 
     scene_scores: dict[str, float] | None = Field(
         default=None,
-        description="WATER/SMOKE probabilities from scene classifier when active.",
+        description="WATER probability from scene classifier when active.",
     )
 
     inference_time_ms: float = Field(ge=0.0)

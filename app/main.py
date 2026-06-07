@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import classify, health, training
+from app.api.v1 import classify, health, images, training
 from app.config import get_settings
 from app.utils.logger import get_logger, setup_logging
 
@@ -37,6 +37,7 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(classify.router, prefix="/api/v1")
+app.include_router(images.router, prefix="/api/v1")
 app.include_router(training.router, prefix="/api/v1")
 
 if _DEMO_STATIC.is_dir():
