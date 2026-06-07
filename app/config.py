@@ -58,6 +58,15 @@ class Settings(BaseSettings):
     # Local UI only: when weights file missing, return a fake SUGGEST row (BR-AI-001 demo).
     classify_demo_mode: bool = False
 
+    # Scene classifier (EfficientNet-B0) — empty string disables it
+    scene_classifier_path: str = ""
+    scene_classifier_version: str = ""  # BR-AI-005 audit label when scene weights are loaded
+    scene_classifier_threshold: float = 0.45
+
+    # Trash subtype classifier (EfficientNet-B0) — empty string disables it
+    trash_subtype_model_path: str = ""
+    trash_subtype_threshold: float = 0.40  # min confidence to report a subtype (vs UNKNOWN)
+
 
 @lru_cache
 def get_settings() -> Settings:

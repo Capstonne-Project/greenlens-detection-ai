@@ -5,23 +5,26 @@
 #   ml/training/data/pollution/
 #     images/train/   (*.jpg hoặc *.png)
 #     images/val/
+#     images/test/
 #     labels/train/   (*.txt — cùng tên base với ảnh)
 #     labels/val/
+#     labels/test/
 #
 # Mỗi file nhãn: một dòng mỗi object
 #   class_id x_center y_center width height
 # các tọa độ chuẩn hóa 0–1 so với kích thước ảnh (định dạng YOLO).
 #
 # class_id theo đúng thứ tự dưới đây (phải khớp với app classify):
-#   0 TRASH, 1 WATER, 2 SMOKE, 3 CHEMICAL
+#   0 TRASH, 1 WATER
+#
+# Split: 70% train / 15% val / 15% test (seed=42)
 
 path: ml/training/data/pollution
 train: images/train
 val: images/val
+test: images/test
 
-nc: 4
+nc: 2
 names:
   0: TRASH
   1: WATER
-  2: SMOKE
-  3: CHEMICAL

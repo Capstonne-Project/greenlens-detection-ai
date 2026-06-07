@@ -26,7 +26,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Train pollution YOLO (TRASH/WATER/SMOKE/CHEMICAL)."
+        description="Train pollution YOLO (TRASH/WATER/SMOKE) — 3 classes, joint training."
     )
     parser.add_argument(
         "--data",
@@ -41,6 +41,12 @@ def main() -> int:
     parser.add_argument("--epochs", type=int, default=50)
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--batch", type=int, default=16)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=8,
+        help="DataLoader worker processes (set 0 for safer web/background runs on Windows).",
+    )
     parser.add_argument("--project", default="ml/training/runs")
     parser.add_argument("--name", default="pollution_detect")
     args = parser.parse_args()
@@ -56,6 +62,7 @@ def main() -> int:
     print("data:", data_path)
     print("model:", ckpt)
     print("epochs:", args.epochs, "| imgsz:", args.imgsz, "| batch:", args.batch)
+    print("workers:", args.workers)
 
     runs_project = (_PROJECT_ROOT / args.project).resolve()
     runs_project.mkdir(parents=True, exist_ok=True)
@@ -66,17 +73,29 @@ def main() -> int:
         epochs=args.epochs,
         imgsz=args.imgsz,
         batch=args.batch,
+        workers=args.workers,
         project=str(runs_project),
         name=args.name,
         exist_ok=True,
     )
 
     out = runs_project / args.name / "weights" / "best.pt"
-    print("\nTraining finished. Typical best weights path:")
-    print(out.resolve())
-    print("\nCopy to ml/weights/ and set MODEL_PATH in .env, e.g.")
+    out_abs = out.resolve()
+    weights_dest = (_PROJECT_ROOT / "ml" / "weights" / "best.pt").resolve()
+
+    print("\n" + "=" * 60)
+    print("[DONE] Training finished!")
+    print("=" * 60)
+    print(f"  best.pt  : {out_abs}")
+    print(f"  exists   : {out_abs.is_file()}")
+    print()
+    print("--- Paste vao .env ---------------------------------")
     print("  MODEL_PATH=ml/weights/best.pt")
-    print("Also bump MODEL_VERSION for audit logs.")
+    print(f"  MODEL_VERSION=v?.?.0-<ten_dataset>-{args.epochs}ep")
+    print()
+    print("--- Copy lenh (chay tu repo root) ------------------")
+    print(f'  copy "{out_abs}" "{weights_dest}"')
+    print("=" * 60)
     return 0
 
 

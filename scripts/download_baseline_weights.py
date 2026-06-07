@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch Ultralytics pretrained YOLOv8 nano .pt into ml/weights/yolov8n.pt.
 
-Baseline uses COCO class names — your app maps only TRASH/WATER/SMOKE/CHEMICAL,
+Baseline uses COCO class names — your app maps only TRASH/WATER/SMOKE,
 so predictions may stay empty until you fine-tune on pollution data or extend mapping.
 
 Usage:
@@ -35,7 +35,7 @@ def main() -> int:
     print("Done.")
     print(
         "\nRemember: pretrained COCO classes do not match pollution labels; "
-        "train a custom checkpoint for TRASH/WATER/SMOKE/CHEMICAL (see docs/AI_Service_Development_Plan.md Phase 3).",
+        "train a custom checkpoint for TRASH/WATER/SMOKE (see docs/AI_Service_Development_Plan.md Phase 3).",
     )
     return 0
 

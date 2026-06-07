@@ -17,6 +17,7 @@ def _tiny_jpeg_bytes() -> bytes:
 def test_demo_mode_returns_suggest_stub():
     settings = Settings(
         model_path="ml/weights/__surely_missing_file__.pt",
+        scene_classifier_path="",
         model_version="v0.test",
         classify_demo_mode=True,
     )
@@ -35,6 +36,7 @@ def test_demo_mode_returns_suggest_stub():
 def test_without_demo_mode_stays_empty_stub():
     settings = Settings(
         model_path="ml/weights/__surely_missing_file__.pt",
+        scene_classifier_path="",
         model_version="v0.test",
         classify_demo_mode=False,
     )

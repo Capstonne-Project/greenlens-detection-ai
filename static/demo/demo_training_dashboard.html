@@ -1,0 +1,3438 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <title>GreenLens — Training dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --surface: rgba(255, 255, 255, 0.72);
+        --surface-strong: rgba(255, 255, 255, 0.9);
+        --stroke: rgba(255, 255, 255, 0.55);
+        --line: rgba(15, 23, 42, 0.08);
+        --text: #0f172a;
+        --muted: #64748b;
+        --brand: #059669;
+        --brand-deep: #047857;
+        --brand-glow: rgba(16, 185, 129, 0.45);
+        --sky: #0ea5e9;
+        --accent-glow: rgba(14, 165, 233, 0.22);
+        --success-bg: #ecfdf5;
+        --success-fg: #047857;
+        --terminal: #0c1222;
+        --terminal-border: rgba(52, 211, 153, 0.12);
+        --terminal-fg: #86efac;
+        --radius-lg: 20px;
+        --radius-md: 14px;
+        --radius-sm: 10px;
+        --shadow-soft: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+        --shadow-lift: 0 24px 48px -12px rgba(15, 23, 42, 0.12), 0 12px 24px -8px rgba(15, 23, 42, 0.08);
+        --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+        --font-mono: "JetBrains Mono", Consolas, monospace;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.001ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.001ms !important;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: var(--font-sans);
+        color: var(--text);
+        line-height: 1.5;
+        -webkit-font-smoothing: antialiased;
+        background-color: #e8eef5;
+        position: relative;
+        overflow-x: hidden;
+      }
+
+      body::before,
+      body::after {
+        content: "";
+        position: fixed;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.52;
+        z-index: 0;
+        pointer-events: none;
+      }
+      body::before {
+        width: min(72vw, 680px);
+        height: min(72vw, 680px);
+        top: -16%;
+        right: -14%;
+        background: radial-gradient(circle, rgba(16, 185, 129, 0.5) 0%, rgba(14, 165, 233, 0.12) 58%, transparent 72%);
+        animation: drift-a 20s ease-in-out infinite;
+      }
+      body::after {
+        width: min(88vw, 780px);
+        height: min(88vw, 780px);
+        bottom: -28%;
+        left: -18%;
+        background: radial-gradient(circle, rgba(14, 165, 233, 0.32) 0%, rgba(5, 150, 105, 0.12) 48%, transparent 70%);
+        animation: drift-b 24s ease-in-out infinite;
+      }
+      @keyframes drift-a {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        50% {
+          transform: translate(-3%, 4%) scale(1.06);
+        }
+      }
+      @keyframes drift-b {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        50% {
+          transform: translate(4%, -3%) scale(1.07);
+        }
+      }
+
+      /* ===== SIDEBAR LAYOUT ===== */
+      .app-shell {
+        position: relative;
+        z-index: 1;
+        display: flex;
+        min-height: 100vh;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        bottom: 0;
+        width: 230px;
+        background: rgba(255, 255, 255, 0.78);
+        border-right: 1px solid rgba(15, 23, 42, 0.07);
+        backdrop-filter: blur(20px) saturate(1.4);
+        -webkit-backdrop-filter: blur(20px) saturate(1.4);
+        display: flex;
+        flex-direction: column;
+        padding: 1.25rem 0 1.5rem;
+        z-index: 100;
+        box-shadow: 4px 0 24px rgba(15, 23, 42, 0.05);
+      }
+
+      .sidebar-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.62rem;
+        padding: 0 1.1rem 1.25rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+        margin-bottom: 0.85rem;
+      }
+      .sidebar-logo .logo-mark {
+        width: 2.25rem;
+        height: 2.25rem;
+        border-radius: 12px;
+        flex-shrink: 0;
+      }
+      .sidebar-logo .logo-mark svg {
+        width: 1.1rem;
+        height: 1.1rem;
+      }
+      .sidebar-logo-text {
+        display: flex;
+        flex-direction: column;
+      }
+      .sidebar-logo-text strong {
+        font-size: 0.9rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+        color: var(--text);
+        line-height: 1.1;
+      }
+      .sidebar-logo-text span {
+        font-size: 0.68rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      .sidebar-section-label {
+        padding: 0 1.1rem;
+        margin-bottom: 0.3rem;
+        margin-top: 0.55rem;
+        font-size: 0.62rem;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .sidebar-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        padding: 0 0.55rem;
+        flex: 1;
+      }
+
+      .sidebar-nav a {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.52rem 0.65rem;
+        border-radius: 10px;
+        font-size: 0.83rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-decoration: none;
+        transition: background 0.15s, color 0.15s;
+        cursor: pointer;
+      }
+      .sidebar-nav a:hover:not(.active) {
+        background: rgba(5, 150, 105, 0.07);
+        color: var(--brand-deep);
+      }
+      .sidebar-nav a.active {
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.14), rgba(5, 150, 105, 0.08));
+        color: var(--brand-deep);
+        border: 1px solid rgba(16, 185, 129, 0.2);
+      }
+      .sidebar-nav a .nav-icon {
+        width: 1.5rem;
+        height: 1.5rem;
+        border-radius: 7px;
+        display: grid;
+        place-items: center;
+        font-size: 0.85rem;
+        flex-shrink: 0;
+      }
+      .sidebar-nav a.active .nav-icon {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: #fff;
+        box-shadow: 0 3px 10px rgba(5, 150, 105, 0.3);
+      }
+
+      .sidebar-divider {
+        margin: 0.6rem 1.1rem;
+        border: none;
+        border-top: 1px solid rgba(15, 23, 42, 0.07);
+      }
+
+      .sidebar-ext-links {
+        padding: 0 0.55rem;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+      .sidebar-ext-links a {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.48rem 0.65rem;
+        border-radius: 10px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--muted);
+        text-decoration: none;
+        transition: background 0.15s, color 0.15s;
+      }
+      .sidebar-ext-links a:hover {
+        background: rgba(14, 165, 233, 0.07);
+        color: #0369a1;
+      }
+
+      .main-content {
+        margin-left: 230px;
+        flex: 1;
+        min-width: 0;
+      }
+
+      .wrap {
+        position: relative;
+        z-index: 1;
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: clamp(1.15rem, 3.5vw, 2rem) clamp(1rem, 3vw, 1.5rem) 3rem;
+      }
+
+      @media (max-width: 768px) {
+        .sidebar { display: none; }
+        .main-content { margin-left: 0; }
+      }
+
+      /* ===== OVERVIEW DASHBOARD ===== */
+      .overview-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 1rem;
+        margin-bottom: 1.05rem;
+      }
+
+      .model-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+        margin-bottom: 0.9rem;
+      }
+      .meta-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        background: rgba(248,250,252,0.9);
+        border: 1px solid rgba(15,23,42,0.08);
+        border-radius: 8px;
+        padding: 0.25rem 0.6rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        font-family: var(--font-mono);
+        color: var(--text);
+      }
+      .meta-chip .meta-lbl { color: var(--muted); font-weight: 600; margin-right: 0.2rem; }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.55rem;
+        margin-bottom: 0.88rem;
+      }
+      @media (max-width: 600px) {
+        .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+      }
+      .metric-box {
+        background: rgba(248,250,252,0.85);
+        border: 1px solid rgba(15,23,42,0.07);
+        border-radius: 12px;
+        padding: 0.6rem 0.7rem;
+        text-align: center;
+      }
+      .metric-box .metric-val {
+        font-size: 1.18rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        font-family: var(--font-mono);
+        color: var(--brand-deep);
+        line-height: 1.2;
+      }
+      .metric-box .metric-lbl {
+        font-size: 0.62rem;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-top: 0.15rem;
+      }
+
+      .model-header-row {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        margin-bottom: 0.9rem;
+      }
+      .model-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.22rem 0.65rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+      }
+      .model-badge.yolo {
+        background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        color: #1d4ed8;
+        border: 1px solid rgba(59, 130, 246, 0.2);
+      }
+      .model-badge.scene {
+        background: linear-gradient(135deg, #fdf4ff, #f3e8ff);
+        color: #7e22ce;
+        border: 1px solid rgba(168, 85, 247, 0.2);
+      }
+
+      .stat-row {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.6rem;
+        margin-bottom: 0.88rem;
+      }
+      .stat-box {
+        background: rgba(248, 250, 252, 0.85);
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        border-radius: 12px;
+        padding: 0.65rem 0.7rem;
+        text-align: center;
+      }
+      .stat-box .stat-val {
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        line-height: 1.15;
+      }
+      .stat-box .stat-val.green { color: var(--brand-deep); }
+      .stat-box .stat-val.blue { color: #1d4ed8; }
+      .stat-box .stat-val.purple { color: #7e22ce; }
+      .stat-box .stat-lbl {
+        font-size: 0.66rem;
+        font-weight: 700;
+        color: var(--muted);
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        margin-top: 0.18rem;
+      }
+
+      .model-status-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 0.72rem;
+        flex-wrap: wrap;
+      }
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+      }
+      .status-dot.green { background: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,0.2); }
+      .status-dot.yellow { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245,158,11,0.2); }
+      .status-dot.red { background: #ef4444; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
+      .status-dot.gray { background: #94a3b8; }
+
+      .jobs-table-wrap {
+        border: 1px solid rgba(15, 23, 42, 0.07);
+        border-radius: 12px;
+        overflow: hidden;
+        font-size: 0.775rem;
+      }
+      .jobs-table-wrap table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .jobs-table-wrap thead {
+        background: rgba(248, 250, 252, 0.9);
+      }
+      .jobs-table-wrap th {
+        padding: 0.48rem 0.65rem;
+        text-align: left;
+        font-size: 0.68rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+        border-bottom: 1px solid rgba(15, 23, 42, 0.07);
+      }
+      .jobs-table-wrap td {
+        padding: 0.45rem 0.65rem;
+        border-bottom: 1px solid rgba(15, 23, 42, 0.04);
+        font-weight: 600;
+        color: var(--text);
+        font-family: var(--font-mono);
+        font-size: 0.72rem;
+      }
+      .jobs-table-wrap tr:last-child td { border-bottom: none; }
+      .jobs-table-wrap tr:hover td { background: rgba(5, 150, 105, 0.025); }
+
+      .jobs-status-pill {
+        display: inline-block;
+        padding: 0.15rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.65rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
+      }
+      .jobs-status-pill.SUCCEEDED { background: #ecfdf5; color: #047857; border: 1px solid rgba(16,185,129,0.25); }
+      .jobs-status-pill.FAILED { background: #fef2f2; color: #b91c1c; border: 1px solid rgba(239,68,68,0.2); }
+      .jobs-status-pill.RUNNING { background: #eff6ff; color: #1d4ed8; border: 1px solid rgba(59,130,246,0.2); }
+      .jobs-status-pill.QUEUED { background: #fffbeb; color: #92400e; border: 1px solid rgba(245,158,11,0.2); }
+
+      .jobs-pagination {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 0.75rem;
+        padding-top: 0.65rem;
+        border-top: 1px solid var(--border);
+        font-size: 0.82rem;
+        color: var(--muted);
+      }
+      .jobs-pagination button:disabled {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+
+      .overview-refresh-btn {
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--brand-deep);
+        background: rgba(236, 253, 245, 0.8);
+        border: 1px solid rgba(16, 185, 129, 0.25);
+        border-radius: 8px;
+        padding: 0.38rem 0.8rem;
+        cursor: pointer;
+        margin-top: 0;
+        box-shadow: none;
+        transition: background 0.15s;
+      }
+      .overview-refresh-btn:hover { background: #d1fae5; }
+
+      .metrics-chip-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-bottom: 0.72rem;
+      }
+      .metrics-chip {
+        background: rgba(248, 250, 252, 0.9);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        border-radius: 8px;
+        padding: 0.28rem 0.6rem;
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--text);
+        font-family: var(--font-mono);
+      }
+      .metrics-chip span { color: var(--muted); font-weight: 600; }
+
+      .empty-state {
+        text-align: center;
+        padding: 1.5rem 1rem;
+        color: var(--muted);
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      .hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        padding: 0.28rem 0.75rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--brand-deep);
+        background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(236, 253, 245, 0.92));
+        border: 1px solid rgba(16, 185, 129, 0.28);
+        box-shadow: 0 2px 12px rgba(5, 150, 105, 0.12);
+        margin-bottom: 0.85rem;
+      }
+      .hero-badge .dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--brand);
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+      }
+
+      .brand-row {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        gap: 1rem 1.2rem;
+        margin-bottom: 0;
+      }
+      .logo-wrap {
+        position: relative;
+        flex-shrink: 0;
+      }
+      .logo-mark {
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: 18px;
+        background: linear-gradient(145deg, #10b981 0%, #059669 45%, #047857 100%);
+        box-shadow:
+          0 12px 28px var(--brand-glow),
+          inset 0 1px 0 rgba(255, 255, 255, 0.35);
+        display: grid;
+        place-items: center;
+      }
+      .logo-mark svg {
+        width: 1.45rem;
+        height: 1.45rem;
+        color: #fff;
+      }
+      .logo-glow {
+        position: absolute;
+        inset: -8px;
+        border-radius: 22px;
+        background: linear-gradient(135deg, rgba(16, 185, 129, 0.35), transparent 60%);
+        z-index: -1;
+        filter: blur(12px);
+      }
+
+      .page-title {
+        margin: 0;
+        font-size: clamp(1.38rem, 3.8vw, 1.82rem);
+        font-weight: 800;
+        letter-spacing: -0.035em;
+        line-height: 1.18;
+        background: linear-gradient(118deg, #0f172a 0%, #1e293b 38%, #047857 105%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+      }
+      .subtitle {
+        margin: 0.5rem 0 0;
+        font-size: 0.95rem;
+        color: var(--muted);
+        max-width: 52rem;
+      }
+
+      .tab-bar {
+        display: inline-flex;
+        padding: 4px;
+        margin-top: 1.35rem;
+        margin-bottom: 1.65rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.55);
+        border: 1px solid var(--line);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+      }
+      .tab-bar a {
+        padding: 0.45rem 1.05rem;
+        border-radius: 999px;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        text-decoration: none;
+        color: var(--muted);
+        transition:
+          color 0.2s,
+          background 0.2s,
+          box-shadow 0.2s;
+      }
+      .tab-bar a:hover:not(.active) {
+        color: var(--brand-deep);
+        background: rgba(255, 255, 255, 0.65);
+      }
+      .tab-bar a.active {
+        color: #fff;
+        background: linear-gradient(180deg, #10b981, #059669);
+        box-shadow:
+          0 6px 20px rgba(5, 150, 105, 0.35),
+          inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      }
+      .tab-bar a:focus-visible {
+        outline: 2px solid var(--sky);
+        outline-offset: 2px;
+      }
+
+      .card {
+        position: relative;
+        padding: 1.2rem 1.35rem 1.38rem;
+        margin-bottom: 1.05rem;
+        border-radius: var(--radius-lg);
+        background: linear-gradient(145deg, var(--surface) 0%, var(--surface-strong) 100%);
+        border: 1px solid var(--stroke);
+        box-shadow: var(--shadow-soft);
+        backdrop-filter: blur(20px) saturate(1.35);
+        -webkit-backdrop-filter: blur(20px) saturate(1.35);
+        transition:
+          transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+          box-shadow 0.35s ease;
+      }
+      .card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-lift);
+      }
+      .card-top-shine {
+        position: absolute;
+        top: 0;
+        left: 10%;
+        right: 10%;
+        height: 1px;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95), transparent);
+        pointer-events: none;
+      }
+
+      .card h3 {
+        margin: 0 0 0.92rem;
+        font-size: 0.9375rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        display: flex;
+        align-items: center;
+        gap: 0.52rem;
+      }
+      .step-num {
+        display: grid;
+        place-items: center;
+        width: 1.85rem;
+        height: 1.85rem;
+        border-radius: 11px;
+        font-size: 0.8rem;
+        font-weight: 800;
+        color: var(--brand-deep);
+        background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+        border: 1px solid rgba(16, 185, 129, 0.22);
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      }
+
+      .card > p.intro {
+        margin: -0.35rem 0 1rem;
+        font-size: 0.895rem;
+        color: var(--muted);
+      }
+
+      .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 0.78rem;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.38rem;
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: var(--text);
+        letter-spacing: -0.01em;
+      }
+      input[type="text"],
+      input[type="number"],
+      input[type="file"] {
+        width: 100%;
+        padding: 0.58rem 0.72rem;
+        border: 1px solid var(--line);
+        border-radius: var(--radius-sm);
+        font: inherit;
+        font-size: 0.875rem;
+        font-weight: 600;
+        background: rgba(255, 255, 255, 0.95);
+        color: var(--text);
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+      input:focus {
+        outline: none;
+        border-color: rgba(5, 150, 105, 0.45);
+        box-shadow: 0 0 0 3px var(--accent-glow);
+      }
+      input[type="file"] {
+        border-style: dashed;
+        border-width: 2px;
+        background: rgba(248, 250, 252, 0.9);
+        cursor: pointer;
+        font-weight: 600;
+      }
+      input[type="file"]:hover {
+        border-color: rgba(5, 150, 105, 0.4);
+        background: rgba(236, 253, 245, 0.45);
+      }
+      input:disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+        background: #f1f5f9;
+      }
+
+      fieldset {
+        border: 1px solid var(--line);
+        border-radius: var(--radius-md);
+        padding: 0.88rem 1rem;
+        margin: 0.55rem 0 1rem;
+        background: rgba(248, 250, 252, 0.65);
+      }
+      legend {
+        padding: 0 0.4rem;
+        font-size: 0.74rem;
+        font-weight: 800;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+      .radio-row label {
+        display: flex;
+        flex-direction: row;
+        align-items: flex-start;
+        gap: 0.55rem;
+        margin-bottom: 0.52rem;
+        font-size: 0.8625rem;
+        font-weight: 600;
+        line-height: 1.42;
+      }
+      .radio-row label:last-child {
+        margin-bottom: 0;
+      }
+      input[type="radio"] {
+        margin-top: 0.28rem;
+        accent-color: var(--brand);
+      }
+
+      label.checkbox-row {
+        flex-direction: row;
+        align-items: center;
+        gap: 0.55rem;
+      }
+      input[type="checkbox"] {
+        width: auto;
+        accent-color: var(--brand);
+      }
+
+      button {
+        position: relative;
+        border: none;
+        border-radius: var(--radius-sm);
+        font-family: var(--font-sans);
+        font-weight: 700;
+        font-size: 0.875rem;
+        padding: 0.62rem 1.28rem;
+        cursor: pointer;
+        margin-top: 0.7rem;
+        transition:
+          transform 0.14s ease,
+          filter 0.2s,
+          box-shadow 0.2s;
+        overflow: hidden;
+      }
+      button:focus-visible {
+        outline: 2px solid var(--sky);
+        outline-offset: 3px;
+      }
+      button:active:not(:disabled) {
+        transform: scale(0.97);
+      }
+
+      button.primary {
+        margin-right: 0.55rem;
+        color: #fff;
+        background: linear-gradient(180deg, #10b981 0%, #059669 55%, #047857 100%);
+        box-shadow:
+          0 8px 24px rgba(5, 150, 105, 0.38),
+          inset 0 1px 0 rgba(255, 255, 255, 0.25);
+      }
+      button.primary::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.16) 50%, transparent 60%);
+        transform: translateX(-100%);
+        transition: transform 0.55s ease;
+      }
+      button.primary:hover:not(:disabled)::after {
+        transform: translateX(100%);
+      }
+      button.primary:hover:not(:disabled) {
+        filter: brightness(1.05);
+        box-shadow: 0 10px 32px rgba(5, 150, 105, 0.45);
+      }
+
+      button.secondary {
+        color: var(--brand-deep);
+        background: rgba(255, 255, 255, 0.92);
+        border: 1.5px solid rgba(16, 185, 129, 0.35);
+        box-shadow: 0 2px 10px rgba(5, 150, 105, 0.08);
+        margin-right: 0;
+      }
+      button.secondary:hover:not(:disabled) {
+        background: #ecfdf5;
+      }
+
+      .result {
+        margin-top: 0.95rem;
+        padding: 0.72rem 0.92rem;
+        border-radius: var(--radius-sm);
+        background: rgba(248, 250, 252, 0.95);
+        border: 1px dashed rgba(100, 116, 139, 0.28);
+        font-size: 0.8725rem;
+        font-weight: 600;
+        color: var(--text);
+      }
+
+      .status-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 0.72rem;
+        margin-bottom: 1rem;
+        align-items: center;
+        font-size: 0.82rem;
+        font-weight: 700;
+      }
+      .pill {
+        display: inline-block;
+        vertical-align: middle;
+        margin-left: 0.35rem;
+        border-radius: 999px;
+        padding: 0.28rem 0.72rem;
+        font-size: 0.765rem;
+        font-weight: 700;
+        background: rgba(238, 242, 255, 0.95);
+        color: #4338ca;
+        border: 1px solid rgba(129, 140, 248, 0.25);
+      }
+      .pill.ok-pill {
+        background: var(--success-bg);
+        color: var(--success-fg);
+        border-color: rgba(16, 185, 129, 0.25);
+      }
+
+      .terminal {
+        border-radius: var(--radius-md);
+        background: var(--terminal);
+        border: 1px solid var(--terminal-border);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.06),
+          0 18px 48px rgba(0, 0, 0, 0.2);
+        overflow: hidden;
+      }
+      .terminal-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+        padding: 0.5rem 0.82rem;
+        background: rgba(15, 23, 42, 0.65);
+        border-bottom: 1px solid rgba(52, 211, 153, 0.12);
+      }
+      .terminal-bar span {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+      }
+      .terminal-bar span:nth-child(1) {
+        background: #f87171;
+      }
+      .terminal-bar span:nth-child(2) {
+        background: #fbbf24;
+      }
+      .terminal-bar span:nth-child(3) {
+        background: #34d399;
+        margin-right: auto;
+      }
+      .terminal-bar .terminal-title {
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        color: rgba(134, 239, 172, 0.6);
+        text-transform: uppercase;
+        font-family: var(--font-mono);
+      }
+      #logBox,
+      #sceneLogBox,
+      #subtypeLogBox {
+        margin: 0;
+        padding: 0.92rem 1rem 1.15rem;
+        min-height: 248px;
+        max-height: 460px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        font-family: var(--font-mono);
+        font-size: 0.78rem;
+        line-height: 1.45;
+        color: var(--terminal-fg);
+        background: transparent;
+      }
+      #logBox::-webkit-scrollbar,
+      #sceneLogBox::-webkit-scrollbar,
+      #subtypeLogBox::-webkit-scrollbar {
+        width: 9px;
+      }
+      #logBox::-webkit-scrollbar-thumb,
+      #sceneLogBox::-webkit-scrollbar-thumb,
+      #subtypeLogBox::-webkit-scrollbar-thumb {
+        background: rgba(52, 211, 153, 0.28);
+        border-radius: 999px;
+      }
+
+      .tab-section {
+        display: none;
+      }
+      .tab-section.active {
+        display: block;
+      }
+
+      code {
+        font-family: var(--font-mono);
+        font-size: 0.78em;
+        font-weight: 500;
+        background: rgba(14, 165, 233, 0.12);
+        color: #0c4a6e;
+        padding: 0.12rem 0.38rem;
+        border-radius: 6px;
+      }
+      #latestMetric {
+        font-weight: 500;
+        font-size: 0.78rem;
+      }
+
+      footer.site-foot {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.75rem;
+        color: var(--muted);
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="app-shell">
+    <!-- ===== SIDEBAR ===== -->
+    <aside class="sidebar" aria-label="Navigation">
+      <div class="sidebar-logo">
+        <div class="logo-wrap">
+          <div class="logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M4 17V9l8-5 8 5v8l-8 5-8-5z" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/>
+              <path d="M12 8v8M8 11l4 4 4-4" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" opacity="0.9"/>
+            </svg>
+          </div>
+        </div>
+        <div class="sidebar-logo-text">
+          <strong>GreenLens AI</strong>
+          <span>Detection Platform</span>
+        </div>
+      </div>
+
+      <div class="sidebar-section-label">Tổng quan</div>
+      <nav class="sidebar-nav">
+        <a id="navOverview" onclick="switchSection('overview')" class="active">
+          <span class="nav-icon">📊</span> AI Dashboard
+        </a>
+      </nav>
+
+      <div class="sidebar-section-label" style="margin-top:0.85rem">Huấn luyện</div>
+      <nav class="sidebar-nav">
+        <a id="navYolo" onclick="switchSection('yolo')">
+          <span class="nav-icon">🎯</span> YOLO — Pollution
+        </a>
+        <a id="navScene" onclick="switchSection('scene')">
+          <span class="nav-icon">🌊</span> Scene Classifier
+        </a>
+        <a id="navSubtype" onclick="switchSection('subtype')">
+          <span class="nav-icon">♻️</span> Loại rác chi tiết
+        </a>
+        <a id="navMerge" onclick="switchSection('merge')">
+          <span class="nav-icon">🗂️</span> Gộp Dataset
+        </a>
+        <a id="navConvert" onclick="switchSection('convert')">
+          <span class="nav-icon">🔄</span> Convert Dataset
+        </a>
+        <a id="navSplit" onclick="switchSection('split')">
+          <span class="nav-icon">✂️</span> Split Dataset
+        </a>
+      </nav>
+
+      <a id="navHistory" onclick="switchSection('history')">
+        <span class="nav-icon">🗄️</span> Dữ liệu &amp; Lịch sử
+      </a>
+
+      <hr class="sidebar-divider"/>
+      <div class="sidebar-ext-links">
+        <a href="/demo/demo_capture_classify.html">
+          <span class="nav-icon" style="font-size:0.85rem">🔍</span> Phân loại ảnh
+        </a>
+        <a href="/docs" target="_blank">
+          <span class="nav-icon" style="font-size:0.85rem">📄</span> API Docs
+        </a>
+      </div>
+    </aside>
+    <!-- ===== MAIN ===== -->
+    <div class="main-content">
+    <div class="wrap">
+      <header class="hero">
+        <div class="hero-badge"><span class="dot" aria-hidden="true"></span> GreenLens</div>
+        <div class="brand-row">
+          <div class="logo-wrap">
+            <div class="logo-glow" aria-hidden="true"></div>
+            <div class="logo-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path
+                  d="M4 17V9l8-5 8 5v8l-8 5-8-5z"
+                  stroke="currentColor"
+                  stroke-width="1.75"
+                  stroke-linejoin="round"
+                />
+                <path
+                  d="M12 8v8M8 11l4 4 4-4"
+                  stroke="currentColor"
+                  stroke-width="1.35"
+                  stroke-linecap="round"
+                  opacity="0.9"
+                />
+              </svg>
+            </div>
+          </div>
+          <div>
+            <h1 class="page-title">GreenLens — AI Model Dashboard</h1>
+            <p class="subtitle">
+              Theo dõi 2 model AI · huấn luyện · lịch sử · metrics. Chạy cùng server FastAPI (<code>/api/v1/training/*</code>).
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===== OVERVIEW DASHBOARD ===== -->
+      <div id="sectionOverview" class="tab-section active">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <h2 style="margin:0;font-size:1.12rem;font-weight:800;letter-spacing:-0.025em;color:var(--text)">Tổng quan 2 Model AI</h2>
+            <p style="margin:0.2rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">Trạng thái, số ảnh train, metrics và lịch sử các lần huấn luyện</p>
+          </div>
+          <button class="overview-refresh-btn" type="button" onclick="loadOverview()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>
+            Làm mới
+          </button>
+        </div>
+
+        <div class="overview-grid">
+          <!-- MODEL 1: YOLO -->
+          <div class="card" id="yoloOverviewCard">
+            <div class="card-top-shine" aria-hidden="true"></div>
+            <div class="model-header-row">
+              <span class="model-badge yolo">Model 1 · YOLO</span>
+              <span style="font-size:0.78rem;font-weight:700;color:var(--muted)">YOLOv8n Object Detection</span>
+            </div>
+
+            <div class="model-status-row" id="yoloModelStatus">
+              <span class="status-dot gray"></span>
+              <span>Đang tải...</span>
+            </div>
+
+            <!-- Model version + dataset info -->
+            <div class="model-meta-row" id="yoloMetaRow">
+              <span class="meta-chip"><span class="meta-lbl">Lần train</span><span id="yoloTotalJobs">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">Dataset</span><span id="yoloDatasetId">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">Ảnh train</span><span id="yoloTrainImages">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">Ảnh val</span><span id="yoloValImages">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">Epochs</span><span id="yoloLatestEpochs">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">Batch</span><span id="yoloLatestBatch">—</span></span>
+            </div>
+
+            <!-- Key metrics 4-up -->
+            <div style="font-size:0.73rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Metrics — lần train gần nhất</div>
+            <div class="metrics-grid" id="yoloMetricsGrid">
+              <div class="metric-box"><div class="metric-val" id="mMAP50">—</div><div class="metric-lbl">mAP50</div></div>
+              <div class="metric-box"><div class="metric-val" id="mMAP5095">—</div><div class="metric-lbl">mAP50-95</div></div>
+              <div class="metric-box"><div class="metric-val" id="mPrecision">—</div><div class="metric-lbl">Precision</div></div>
+              <div class="metric-box"><div class="metric-val" id="mRecall">—</div><div class="metric-lbl">Recall</div></div>
+            </div>
+
+            <!-- Class breakdown -->
+            <div style="font-size:0.73rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.45rem;">Phân bổ class — tổng hợp dataset đã train</div>
+            <div class="stat-row" style="grid-template-columns:repeat(2,1fr);margin-bottom:0.9rem" id="yoloClassStats">
+              <div class="stat-box"><div class="stat-val green" id="classTrash">—</div><div class="stat-lbl">🗑️ TRASH</div></div>
+              <div class="stat-box"><div class="stat-val blue" id="classWater">—</div><div class="stat-lbl">💧 WATER</div></div>
+            </div>
+            <p style="margin:0 0 0.9rem;font-size:0.72rem;color:var(--muted);font-weight:600" id="yoloDatasetNote"></p>
+
+            <div style="font-size:0.73rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Lịch sử train</div>
+            <div class="jobs-table-wrap" id="yoloJobsTable">
+              <div class="empty-state">Chưa có job nào</div>
+            </div>
+          </div>
+
+          <!-- MODEL 2: SCENE CLASSIFIER -->
+          <div class="card" id="sceneOverviewCard">
+            <div class="card-top-shine" aria-hidden="true"></div>
+            <div class="model-header-row">
+              <span class="model-badge scene">Model 2 · Scene</span>
+              <span style="font-size:0.78rem;font-weight:700;color:var(--muted)">EfficientNet-B0 Scene Classifier</span>
+            </div>
+
+            <div class="model-status-row" id="sceneModelStatus">
+              <span class="status-dot gray"></span>
+              <span>Đang tải...</span>
+            </div>
+
+            <div class="model-meta-row">
+              <span class="meta-chip"><span class="meta-lbl">Lần train</span><span id="sceneTotalJobs">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">WATER</span><span id="sceneWaterImages">—</span></span>
+              <span class="meta-chip"><span class="meta-lbl">NEGATIVE</span><span id="sceneNegativeImages">—</span></span>
+            </div>
+
+            <div style="font-size:0.73rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.42rem;">Classes train — tổng hợp dataset đã train</div>
+            <div class="metrics-chip-row" id="sceneClassRow">
+              <span class="metrics-chip" style="color:var(--muted)">Đang tải...</span>
+            </div>
+
+            <div style="font-size:0.73rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.5rem;">Lịch sử train</div>
+            <div class="jobs-table-wrap" id="sceneJobsTable">
+              <div class="empty-state">Chưa có job nào</div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- ===== MODEL 1: YOLO ===== -->
+      <div id="sectionYolo" class="tab-section">
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">1</span> Upload dataset ZIP — YOLO format</h3>
+          <p class="intro">
+            Cấu trúc ZIP: <code>images/train/</code>, <code>images/val/</code>, <code>labels/train/</code>,
+            <code>labels/val/</code>. Nhãn YOLO format: <code>class_id x_center y_center width height</code>
+            với <strong>0=TRASH · 1=WATER</strong> (tọa độ normalize 0–1).
+            Chưa đúng format? Dùng tab <strong>🔄 Convert Dataset</strong> để chuyển đổi trước.
+          </p>
+          <input id="datasetZip" type="file" accept=".zip" />
+          <button class="secondary" type="button" id="uploadBtn">Upload và chuẩn hóa</button>
+          <p id="datasetResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">2</span> Cấu hình training — YOLO</h3>
+          <div class="form-grid">
+            <label>Dataset ID <input id="datasetId" type="text" placeholder="ds_xxxxx" /></label>
+            <label>Run name <input id="runName" type="text" value="pollution_detect" /></label>
+            <label>Epochs <input id="epochs" type="number" value="50" min="1" /></label>
+            <label>Batch <input id="batch" type="number" value="16" min="1" /></label>
+            <label>Kích thước ảnh <input id="imgsz" type="number" value="640" min="128" /></label>
+          </div>
+          <fieldset>
+            <legend>Checkpoint</legend>
+            <div class="radio-row">
+              <label
+                ><input type="radio" name="ckptMode" id="ckptAutoLatest" value="auto_latest" checked /> Tự học tiếp từ job
+                <code>SUCCEEDED</code> gần nhất (khuyên dùng)</label
+              >
+              <label
+                ><input type="radio" name="ckptMode" id="ckptFromJob" value="from_job" /> Theo đúng
+                <code>job_id</code></label
+              >
+              <label
+                ><input type="radio" name="ckptMode" id="ckptExplicitPath" value="explicit_path" /> Đường dẫn model thủ
+                công (<code>.pt</code>)</label
+              >
+            </div>
+          </fieldset>
+          <div class="form-grid">
+            <label>Tiếp tục từ job_id <input id="continueFromJobId" type="text" placeholder="job_xxxxx" /></label>
+            <label>Model path <input id="modelPath" type="text" placeholder="ml/weights/best.pt" /></label>
+          </div>
+          <div class="form-grid" style="margin-top: 0.35rem">
+            <label class="checkbox-row"><input id="wandbEnabled" type="checkbox" /> Bật Weights &amp; Biases</label>
+            <label>W&amp;B project <input id="wandbProject" type="text" placeholder="greenlens-training" /></label>
+            <label>W&amp;B entity <input id="wandbEntity" type="text" placeholder="team hoặc username" /></label>
+            <label
+              >W&amp;B API key (tuỳ chọn) <input id="wandbKey" type="text" placeholder="ưu tiên env WANDB_API_KEY"
+            /></label>
+          </div>
+          <button class="primary" type="button" id="startBtn">Start training</button>
+          <button class="secondary" type="button" id="stopBtn" style="display:none;background:#fef2f2;color:#b91c1c;border-color:#fca5a5">Stop job</button>
+          <p id="jobResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">3</span> Trạng thái và log — YOLO</h3>
+          <div class="status-row">
+            <div>Job: <span id="currentJob" class="pill">(none)</span></div>
+            <div>Trạng thái: <span id="jobStatus" class="pill ok-pill">IDLE</span></div>
+            <div>Metrics: <code id="latestMetric">n/a</code></div>
+          </div>
+          <div class="terminal" role="region" aria-label="Training log">
+            <div class="terminal-bar">
+              <span></span><span></span><span></span><span class="terminal-title">training log — yolo</span>
+            </div>
+            <div id="logBox"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== MODEL 2: SCENE CLASSIFIER ===== -->
+      <div id="sectionScene" class="tab-section">
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">1</span> Upload dataset ZIP — Scene Classifier</h3>
+          <p class="intro">
+            Cấu trúc ZIP: <code>images/train/WATER/</code>,
+            <code>images/train/NEGATIVE/</code> (và tùy chọn <code>images/val/</code> — tự split nếu thiếu).
+            Mỗi thư mục chứa ảnh <code>.jpg</code> / <code>.png</code> trực tiếp, không cần nhãn txt.
+          </p>
+          <input id="sceneDatasetZip" type="file" accept=".zip" />
+          <button class="secondary" type="button" id="sceneUploadBtn">Upload và kiểm tra</button>
+          <p id="sceneDatasetResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">2</span> Cấu hình training — EfficientNet-B0</h3>
+          <div class="form-grid">
+            <label>Dataset ID <input id="sceneDatasetId" type="text" placeholder="sds_xxxxx" /></label>
+            <label>Run name <input id="sceneRunName" type="text" value="scene_classifier" /></label>
+            <label>Epochs <input id="sceneEpochs" type="number" value="15" min="1" /></label>
+            <label>Batch <input id="sceneBatch" type="number" value="16" min="1" /></label>
+            <label>Learning rate <input id="sceneLr" type="number" value="0.0001" step="0.00001" min="0.000001" /></label>
+            <label>Output path (tuỳ chọn) <input id="sceneOutputPath" type="text" placeholder="ml/weights/scene_classifier.pt" /></label>
+          </div>
+          <button class="primary" type="button" id="sceneStartBtn">Start training</button>
+          <p id="sceneJobResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">3</span> Trạng thái và log — Scene Classifier</h3>
+          <div class="status-row">
+            <div>Job: <span id="sceneCurrentJob" class="pill">(none)</span></div>
+            <div>Trạng thái: <span id="sceneJobStatus" class="pill ok-pill">IDLE</span></div>
+            <div id="sceneResultPath" style="font-size:0.8rem;color:var(--muted)"></div>
+          </div>
+          <div class="terminal" role="region" aria-label="Scene training log">
+            <div class="terminal-bar">
+              <span></span><span></span><span></span><span class="terminal-title">training log — scene classifier</span>
+            </div>
+            <div id="sceneLogBox"></div>
+          </div>
+          <p style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">
+            Sau khi job <code>SUCCEEDED</code>: thêm vào <code>.env</code>:<br/>
+            <code>SCENE_CLASSIFIER_PATH=ml/weights/scene_classifier.pt</code>
+          </p>
+        </div>
+      </div>
+
+      <!-- ===== TRASH SUBTYPE (merge + train) ===== -->
+      <div id="sectionSubtype" class="tab-section">
+        <div style="margin-bottom:1rem">
+          <h2 style="margin:0;font-size:1.12rem;font-weight:800;color:var(--text)">♻️ Phân loại loại rác chi tiết (Subtype)</h2>
+          <p style="margin:0.25rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">
+            Sau khi YOLO nhận <strong>TRASH</strong> → model này phân <strong>7 loại</strong> rác. <strong>Không cần file nhãn .txt</strong>, chỉ cần ảnh trong ZIP.
+          </p>
+        </div>
+
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3 style="margin-bottom:0.5rem;font-size:0.95rem">📋 7 loại rác (mã API giữ tiếng Anh)</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.45rem;font-size:0.8rem;line-height:1.45">
+            <div><code>HOUSEHOLD</code> — Sinh hoạt (túi nilon, quần áo cũ, rác hỗn hợp)</div>
+            <div><code>RECYCLABLE</code> — Tái chế (chai PET, lon, carton)</div>
+            <div><code>ORGANIC</code> — Hữu cơ (<strong>thức ăn thừa</strong>, rau củ hỏng)</div>
+            <div><code>MEDICAL</code> — Y tế (khẩu trang, kim tiêm)</div>
+            <div><code>ELECTRONIC</code> — Điện tử (điện thoại, dây cáp)</div>
+            <div><code>CONSTRUCTION</code> — Xây dựng (gạch, xi măng)</div>
+            <div><code>HAZARDOUS</code> — Nguy hại (pin, bình hóa chất)</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">1</span> Gộp nhiều ZIP → 1 bộ dữ liệu chuẩn</h3>
+          <p class="intro">
+            Thêm từng ZIP (TrashNet, Kaggle, ảnh tự chụp…) — <strong>mỗi ZIP chọn đúng loại rác</strong>.
+            Hệ thống gộp và tự chia <code>train</code> / <code>val</code> (mặc định 85% / 15%).
+            Tải file <code>trash_subtype_merged.zip</code> hoặc tick đăng ký để huấn luyện ngay bên dưới.
+          </p>
+          <label style="display:block;margin-bottom:0.5rem">
+            <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase">Thêm file ZIP</span>
+            <input id="subtypeZipInput" type="file" accept=".zip" multiple style="margin-top:0.35rem;display:block" />
+          </label>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">
+            <button class="secondary" type="button" id="subtypeClearAllZips" style="font-size:0.8rem">Xóa tất cả ZIP</button>
+            <span id="subtypeZipCount" style="font-size:0.8rem;color:var(--muted);align-self:center;font-weight:600">0 tệp</span>
+          </div>
+          <div id="subtypeZipClassList" style="margin-bottom:0.75rem"></div>
+          <div class="form-grid" style="margin-bottom:0.75rem">
+            <label>Tỷ lệ val khi gộp (%) <input id="subtypeValFraction" type="number" value="0.15" min="0.05" max="0.4" step="0.01" title="0.15 = 15% ảnh vào val" /></label>
+            <label style="display:flex;align-items:center;gap:0.5rem;margin-top:1.4rem">
+              <input id="subtypeAlsoRegister" type="checkbox" checked />
+              Lưu dataset trên server (tự điền Mã dataset để train)
+            </label>
+          </div>
+          <button class="primary" type="button" id="subtypeMergeBtn">Gộp và tải ZIP chuẩn</button>
+          <p id="subtypeMergeResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">2</span> Tải ZIP đã gộp lên server (nếu chưa tick ở bước 1)</h3>
+          <p class="intro">
+            Cấu trúc bên trong ZIP:
+            <code>images/train/HOUSEHOLD/</code> … <code>images/val/MEDICAL/</code> (7 thư mục loại rác).
+          </p>
+          <input id="subtypeDatasetZip" type="file" accept=".zip" />
+          <button class="secondary" type="button" id="subtypeUploadBtn">Tải lên và kiểm tra</button>
+          <p id="subtypeDatasetResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">3</span> Huấn luyện — EfficientNet-B0 (7 loại rác)</h3>
+          <div class="form-grid">
+            <label>Mã dataset <input id="subtypeDatasetId" type="text" placeholder="tds_xxxxx" /></label>
+            <label>Tên lần chạy <input id="subtypeRunName" type="text" value="trash_subtype_classifier" /></label>
+            <label>Số epoch <input id="subtypeEpochs" type="number" value="100" min="1" /></label>
+            <label>Batch <input id="subtypeBatch" type="number" value="32" min="1" /></label>
+            <label>Tốc độ học (LR) <input id="subtypeLr" type="number" value="0.001" step="0.0001" min="0.000001" /></label>
+            <label>File weights đầu ra <input id="subtypeOutputPath" type="text" placeholder="ml/weights/trash_subtype_classifier.pt" /></label>
+          </div>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:center">
+            <button class="primary" type="button" id="subtypeStartBtn">Bắt đầu huấn luyện</button>
+            <button
+              class="secondary"
+              type="button"
+              id="subtypeStopBtn"
+              style="display:none;background:#fef2f2;color:#b91c1c;border-color:#fca5a5"
+            >
+              Dừng huấn luyện
+            </button>
+          </div>
+          <p id="subtypeJobResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">4</span> Nhật ký huấn luyện</h3>
+          <div class="status-row">
+            <div>Mã job: <span id="subtypeCurrentJob" class="pill">(chưa có)</span></div>
+            <div>Trạng thái: <span id="subtypeJobStatus" class="pill ok-pill">RẢNH</span></div>
+            <div id="subtypeResultPath" style="font-size:0.8rem;color:var(--muted)"></div>
+          </div>
+          <div class="terminal" role="region" aria-label="Nhật ký huấn luyện loại rác chi tiết">
+            <div class="terminal-bar">
+              <span></span><span></span><span></span><span class="terminal-title">nhật ký — loại rác chi tiết</span>
+            </div>
+            <div id="subtypeLogBox"></div>
+          </div>
+          <p style="margin-top:0.75rem;font-size:0.82rem;color:var(--muted)">
+            Khi trạng thái <strong>Thành công</strong>, thêm vào <code>.env</code>:<br/>
+            <code>TRASH_SUBTYPE_MODEL_PATH=ml/weights/trash_subtype_classifier.pt</code>
+          </p>
+        </div>
+      </div>
+
+      <!-- ===== MERGE DATASET ===== -->
+      <div id="sectionMerge" class="tab-section">
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <h2 style="margin:0;font-size:1.12rem;font-weight:800;letter-spacing:-0.025em;color:var(--text)">🗂️ Gộp Dataset — nhiều ZIP → 1 ZIP</h2>
+            <p style="margin:0.2rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">Thêm bao nhiêu ZIP cũng được (nhiều bộ WATER, nhiều bộ TRASH…), chọn class từng file, gộp chuẩn YOLO 2-class</p>
+          </div>
+        </div>
+
+        <!-- Dynamic ZIP queue -->
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3 style="margin-bottom:0.5rem;font-size:0.95rem">📁 Thêm file ZIP</h3>
+          <p style="margin:0 0 0.75rem;font-size:0.82rem;color:var(--muted);line-height:1.45">
+            Chọn nhiều file cùng lúc hoặc thêm từng lần — ví dụ gộp 5 dataset WATER từ Roboflow, rồi thêm 2 ZIP TRASH.
+          </p>
+          <label style="display:block;margin-bottom:0.5rem">
+            <span style="font-size:0.75rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em">Thêm file ZIP</span>
+            <input id="mergeZipInput" type="file" accept=".zip" multiple style="margin-top:0.35rem;display:block" />
+          </label>
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap;margin-bottom:0.5rem">
+            <button class="secondary" type="button" id="mergeClearAllZips" style="font-size:0.8rem">Xóa tất cả ZIP</button>
+            <span id="mergeZipCount" style="font-size:0.8rem;color:var(--muted);align-self:center;font-weight:600">0 tệp</span>
+          </div>
+          <div id="mergeZipClassList" style="margin-bottom:0.25rem"></div>
+        </div>
+
+        <!-- Summary + merge button -->
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3 style="margin-bottom:0.7rem">📦 Tổng hợp &amp; Gộp</h3>
+
+          <!-- Live summary bar -->
+          <div id="mergeSummaryBar" style="display:grid;grid-template-columns:repeat(2,1fr);gap:0.55rem;margin-bottom:1rem">
+            <div class="stat-box" id="mergeSumTrash"><div class="stat-val green" id="mergeSumTrashVal">—</div><div class="stat-lbl">🗑️ TRASH ảnh</div></div>
+            <div class="stat-box" id="mergeSumWater"><div class="stat-val blue" id="mergeSumWaterVal">—</div><div class="stat-lbl">💧 WATER ảnh</div></div>
+          </div>
+
+          <!-- data.yaml preview -->
+          <div style="margin-bottom:1rem">
+            <div style="font-size:0.72rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:0.4rem">data.yaml sẽ được nhúng vào ZIP</div>
+            <div style="border-radius:10px;background:rgba(15,18,34,0.88);border:1px solid rgba(52,211,153,0.15);padding:0.7rem 0.9rem">
+              <pre style="margin:0;font-family:var(--font-mono);font-size:0.8rem;color:#86efac;line-height:1.6">path: .
+train: images/train
+val:   images/val
+test:  images/test
+nc: 2
+names:
+  0: TRASH
+  1: WATER</pre>
+            </div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap">
+            <button class="primary" type="button" id="mergeRunBtn" style="margin-top:0">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" style="margin-right:0.3rem;vertical-align:-2px"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              Gộp &amp; Download ZIP
+            </button>
+            <span style="font-size:0.8rem;color:var(--muted);font-weight:600">→ Sau đó upload vào tab <strong>🎯 YOLO</strong> để train</span>
+          </div>
+
+          <div id="mergeResultBox" class="result" style="display:none;margin-top:0.85rem"></div>
+        </div>
+
+      </div><!-- /sectionMerge -->
+
+      <!-- ===== CONVERT DATASET ===== -->
+      <div id="sectionConvert" class="tab-section">
+
+        <!-- ── Workflow guide ── -->
+        <div class="card" style="background:linear-gradient(135deg,rgba(236,253,245,0.9),rgba(240,249,255,0.85));border-color:rgba(16,185,129,0.2)">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3 style="margin-bottom:0.6rem">📋 Workflow: Tải dataset về → Đưa vào train</h3>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:0.7rem;margin-bottom:0.5rem">
+            <div style="background:rgba(255,255,255,0.8);border-radius:12px;padding:0.75rem 0.9rem;border:1px solid rgba(16,185,129,0.15)">
+              <div style="font-size:0.72rem;font-weight:800;color:var(--brand-deep);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem">Bước 1 — Tải dataset</div>
+              <div style="font-size:0.82rem;color:var(--text);font-weight:600;line-height:1.55">
+                Tải ZIP từ <strong>Roboflow Universe</strong> (format <strong>YOLOv8</strong>).<br/>
+                Tìm: <code>smoke detection</code>, <code>garbage detection</code>, <code>water pollution</code>
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.8);border-radius:12px;padding:0.75rem 0.9rem;border:1px solid rgba(14,165,233,0.15)">
+              <div style="font-size:0.72rem;font-weight:800;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem">Bước 2 — Convert class name</div>
+              <div style="font-size:0.82rem;color:var(--text);font-weight:600;line-height:1.55">
+                Dùng <strong>Remap class names</strong> bên dưới.<br/>
+                Map tên class dataset → <code>TRASH</code> / <code>WATER</code>.<br/>
+                Download ZIP đã convert.
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.8);border-radius:12px;padding:0.75rem 0.9rem;border:1px solid rgba(124,58,237,0.15)">
+              <div style="font-size:0.72rem;font-weight:800;color:#7e22ce;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem">Bước 3 — Restructure (nếu cần)</div>
+              <div style="font-size:0.82rem;color:var(--text);font-weight:600;line-height:1.55">
+                Nếu ZIP chưa có đúng cấu trúc <code>images/train</code> + <code>labels/train</code> →<br/>
+                Dùng <strong>Restructure</strong> để tự động tách train/val.
+              </div>
+            </div>
+            <div style="background:rgba(255,255,255,0.8);border-radius:12px;padding:0.75rem 0.9rem;border:1px solid rgba(245,158,11,0.2)">
+              <div style="font-size:0.72rem;font-weight:800;color:#92400e;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:0.35rem">Bước 4 — Upload &amp; Train</div>
+              <div style="font-size:0.82rem;color:var(--text);font-weight:600;line-height:1.55">
+                Vào tab <strong>🎯 YOLO — Pollution</strong> → Upload ZIP → Start training.<br/>
+                Batch 8 · Epochs 50 · Workers 0 cho máy yếu.
+              </div>
+            </div>
+          </div>
+          <p style="margin:0;font-size:0.78rem;color:var(--muted);font-weight:600">
+            💡 <strong>Tip:</strong> Nếu dataset Roboflow đã đúng format YOLOv8 và chỉ cần đổi tên class → bỏ qua Bước 3, upload thẳng sau Bước 2.
+          </p>
+        </div>
+
+        <!-- ── Filter classes (xóa class không cần) ── -->
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3>🗑️ Lọc class — tự động xóa ảnh &amp; label không cần</h3>
+          <p class="intro">
+            Upload ZIP dataset. Server đọc <code>data.yaml</code> để liệt kê các class.
+            Tick vào class muốn <strong>giữ lại</strong> — ảnh nào chỉ chứa class bị bỏ sẽ bị
+            xóa hoàn toàn (cả ảnh lẫn <code>.txt</code>). YAML được viết lại với class mới, ID được re-index từ 0.
+          </p>
+
+          <!-- Step 1: upload + scan -->
+          <div style="display:flex;align-items:flex-end;gap:0.75rem;flex-wrap:wrap;margin-bottom:0.75rem">
+            <label style="flex:1;min-width:200px">
+              ZIP Dataset
+              <input id="filterZipInput" type="file" accept=".zip" />
+            </label>
+            <button class="secondary" type="button" id="filterScanBtn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Đọc danh sách class
+            </button>
+          </div>
+          <p id="filterScanResult" class="result" style="margin-bottom:0.5rem"></p>
+
+          <!-- Step 2: checkboxes (hidden until scanned) -->
+          <div id="filterClassList" style="display:none;margin-bottom:1rem">
+            <p style="font-size:0.82rem;font-weight:700;color:var(--muted);margin:0 0 0.5rem">
+              Chọn class muốn <span style="color:var(--brand)">GIỮ LẠI</span>:
+            </p>
+            <div id="filterCheckboxes" style="display:flex;flex-direction:column;gap:0.45rem"></div>
+            <div style="display:flex;gap:0.5rem;margin-top:0.65rem">
+              <button class="secondary" type="button" id="filterSelectAll" style="font-size:0.78rem;padding:0.3rem 0.7rem">Chọn tất cả</button>
+              <button class="secondary" type="button" id="filterSelectNone" style="font-size:0.78rem;padding:0.3rem 0.7rem">Bỏ chọn tất cả</button>
+            </div>
+          </div>
+
+          <!-- Step 3: run -->
+          <button class="primary" type="button" id="filterRunBtn" style="display:none">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+            Lọc &amp; Tải về ZIP
+          </button>
+          <p id="filterRunResult" class="result" style="margin-top:0.75rem"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3>Restructure — đổi cấu trúc thư mục sang chuẩn YOLO</h3>
+          <p class="intro">
+            Input ZIP có cấu trúc <code>train/&lt;ảnh&gt;</code> + <code>labels/&lt;txt&gt;</code>
+            → Output ZIP chuẩn <code>images/train</code>, <code>images/val</code>, <code>images/test</code>,
+            <code>labels/train</code>, <code>labels/val</code>, <code>labels/test</code> sẵn để upload train.<br/>
+            Label tự convert OBB → AABB nếu cần. Split mặc định 70 / 15 / 15 (train/val/test), seed=42.
+          </p>
+          <div class="form-grid" style="margin-bottom:0.75rem">
+            <label>ZIP đầu vào <input id="restructureZip" type="file" accept=".zip" /></label>
+            <label>Val fraction (0.05–0.4) <input id="restructureValFrac" type="number" value="0.15" step="0.05" min="0.05" max="0.4" /></label>
+            <label>Test fraction (0.05–0.4) <input id="restructureTestFrac" type="number" value="0.15" step="0.05" min="0.05" max="0.4" /></label>
+          </div>
+          <button class="secondary" type="button" id="restructureBtn">Convert &amp; Download ZIP</button>
+          <p id="restructureResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">1</span> Remap class names</h3>
+          <p class="intro">
+            Upload dataset ZIP bất kỳ từ Roboflow, Kaggle, v.v. Server đọc <code>data.yaml</code>
+            và liệt kê class có trong dataset. Bạn map từng class sang <code>TRASH</code> / <code>WATER</code>
+            hoặc <code>SKIP</code> (xóa bỏ). Class ID sẽ được tự động re-index về đúng <strong>0·1</strong>.
+          </p>
+          <input id="convertZip" type="file" accept=".zip" />
+          <button class="secondary" type="button" id="inspectBtn">Đọc class names</button>
+          <p id="inspectResult" class="result"></p>
+        </div>
+
+        <div class="card" id="mappingCard" style="display:none">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3><span class="step-num">2</span> Map class về đúng label dự án</h3>
+          <p class="intro">
+            Chọn mỗi class trong dataset tương ứng với class nào của GreenLens (<code>TRASH · WATER</code>).
+            Class chọn <code>SKIP</code> sẽ bị xóa khỏi tất cả label — dòng bbox đó không được train.
+            Server tự re-index class ID về 0·1 và ghi lại <code>data.yaml</code> mới.
+          </p>
+          <div id="mappingRows" style="display:flex;flex-direction:column;gap:0.6rem;margin-bottom:1rem"></div>
+          <button class="primary" type="button" id="convertBtn">Convert &amp; Download ZIP</button>
+          <p id="convertResult" class="result"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3>Hướng dẫn</h3>
+          <p style="font-size:0.88rem;color:var(--muted);line-height:1.7;margin:0">
+            <strong>Ví dụ thực tế — Roboflow "Garbage Detection":</strong><br/>
+            Dataset có: <code>0: Plastic Trash</code> · <code>1: bottle</code> · <code>2: food packaging</code> · <code>3: person</code><br/>
+            → Map <code>0,1,2</code> về <code>TRASH</code> · Map <code>3: person</code> → <code>SKIP</code><br/>
+            → Server đổi tất cả label về <code>class_id=0</code>, xóa dòng <code>person</code>, ghi lại <code>data.yaml</code> với <code>nc:1 · 0:TRASH</code><br/>
+            → Download ZIP mới → Upload vào tab <strong>🎯 YOLO — Pollution</strong> để train.<br/><br/>
+            <strong>Tip quan trọng:</strong> Mỗi class từ Roboflow nên được map riêng — đừng merge WATER vào TRASH vì model sẽ không phân biệt được.<br/>
+            Tải <strong>từng dataset riêng biệt</strong> cho từng class (TRASH riêng, WATER riêng) → convert từng cái → upload lần lượt vào cùng 1 training job.
+          </p>
+        </div>
+      </div>
+
+      <!-- ===== SPLIT DATASET ===== -->
+      <div id="sectionSplit" class="tab-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <h2 style="margin:0;font-size:1.12rem;font-weight:800;letter-spacing:-0.025em;color:var(--text)">✂️ Tách Dataset</h2>
+            <p style="margin:0.2rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">Tách ZIP dataset thành 2 phần — ảnh &amp; label khớp tên nhau, cả 2 phần đều được nén và tải về</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3>Cấu hình tách</h3>
+          <p class="intro">
+            Upload file ZIP chứa dataset YOLO (ảnh + label). Nhập số lượng ảnh muốn tách ra.
+            Server sẽ ghép đúng cặp <code>image ↔ label</code> theo tên file, rồi trả về 1 ZIP bọc ngoài
+            chứa <strong>2 file ZIP bên trong</strong>: phần tách và phần còn lại.
+          </p>
+
+          <div class="form-grid" style="margin-bottom:1rem">
+            <label>
+              ZIP Dataset đầu vào
+              <input id="splitZipInput" type="file" accept=".zip" />
+            </label>
+            <label>
+              Số ảnh muốn tách ra
+              <input id="splitCountInput" type="number" value="100" min="1" step="1"
+                     placeholder="VD: 100" style="width:100%" />
+            </label>
+          </div>
+
+          <!-- Info bar (hidden until file chosen) -->
+          <div id="splitInfoBar" style="display:none;padding:0.6rem 0.85rem;border-radius:var(--radius-sm);background:rgba(14,165,233,0.08);border:1px solid rgba(14,165,233,0.2);font-size:0.82rem;color:var(--muted);margin-bottom:1rem">
+            <span id="splitInfoText"></span>
+          </div>
+
+          <button class="primary" type="button" id="splitBtn" disabled>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+            Tách &amp; Tải về ZIP
+          </button>
+          <p id="splitResult" class="result" style="margin-top:0.75rem"></p>
+        </div>
+
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <h3>Hướng dẫn</h3>
+          <p style="font-size:0.88rem;color:var(--muted);line-height:1.7;margin:0">
+            <strong>Dataset có 1000 ảnh, muốn tách 200 để test:</strong><br/>
+            → Upload ZIP, nhập <code>200</code> → tải về <code>dataset_split_bundle.zip</code><br/>
+            → Giải nén ra được 2 file:<br/>
+            &nbsp;&nbsp;• <code>dataset_split_200.zip</code> — 200 ảnh + label tương ứng<br/>
+            &nbsp;&nbsp;• <code>dataset_remainder_800.zip</code> — 800 ảnh + label còn lại<br/><br/>
+            <strong>Lưu ý:</strong> Ảnh và label được ghép theo <strong>tên file</strong> (stem).
+            Ảnh không có label tương ứng vẫn được tách nhưng sẽ không có file <code>.txt</code> đi kèm.
+            File <code>data.yaml</code> và các file chung khác có trong cả 2 ZIP.
+          </p>
+        </div>
+      </div>
+
+      <!-- ===== HISTORY: Dữ liệu & Lịch sử ===== -->
+      <div id="sectionHistory" class="tab-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;flex-wrap:wrap;gap:0.5rem;">
+          <div>
+            <h2 style="margin:0;font-size:1.12rem;font-weight:800;letter-spacing:-0.025em">Dữ liệu &amp; Lịch sử Training</h2>
+            <p style="margin:0.2rem 0 0;font-size:0.82rem;color:var(--muted);font-weight:600">Toàn bộ datasets đã upload và các lần train của 2 model AI</p>
+          </div>
+          <button class="overview-refresh-btn" type="button" onclick="loadHistory()">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5"/></svg>
+            Làm mới
+          </button>
+        </div>
+
+        <!-- Summary stats -->
+        <div class="stat-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:1.2rem" id="histSummaryRow">
+          <div class="stat-box"><div class="stat-val" id="histYoloDatasets">—</div><div class="stat-lbl">YOLO Datasets</div></div>
+          <div class="stat-box"><div class="stat-val" id="histYoloJobs">—</div><div class="stat-lbl">YOLO Jobs</div></div>
+          <div class="stat-box"><div class="stat-val" id="histSceneDatasets">—</div><div class="stat-lbl">Scene Datasets</div></div>
+          <div class="stat-box"><div class="stat-val" id="histSceneJobs">—</div><div class="stat-lbl">Scene Jobs</div></div>
+        </div>
+
+        <!-- YOLO Datasets -->
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem">
+            <span class="model-badge yolo">Model 1 · YOLO</span>
+            <span style="font-size:0.82rem;font-weight:700;color:var(--muted)">Datasets đã upload</span>
+          </div>
+          <div class="jobs-table-wrap" id="histYoloDatasetsTable">
+            <div class="empty-state">Đang tải...</div>
+          </div>
+        </div>
+
+        <!-- YOLO Jobs -->
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem">
+            <span class="model-badge yolo">Model 1 · YOLO</span>
+            <span style="font-size:0.82rem;font-weight:700;color:var(--muted)">Toàn bộ lần train</span>
+          </div>
+          <div class="jobs-table-wrap" id="histYoloJobsTable">
+            <div class="empty-state">Đang tải...</div>
+          </div>
+          <div id="histYoloJobsPager"></div>
+        </div>
+
+        <!-- Scene Datasets -->
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem">
+            <span class="model-badge scene">Model 2 · Scene</span>
+            <span style="font-size:0.82rem;font-weight:700;color:var(--muted)">Datasets đã upload</span>
+          </div>
+          <div class="jobs-table-wrap" id="histSceneDatasetsTable">
+            <div class="empty-state">Đang tải...</div>
+          </div>
+        </div>
+
+        <!-- Scene Jobs -->
+        <div class="card">
+          <div class="card-top-shine" aria-hidden="true"></div>
+          <div style="display:flex;align-items:center;gap:0.6rem;margin-bottom:0.85rem">
+            <span class="model-badge scene">Model 2 · Scene</span>
+            <span style="font-size:0.82rem;font-weight:700;color:var(--muted)">Toàn bộ lần train</span>
+          </div>
+          <div class="jobs-table-wrap" id="histSceneJobsTable">
+            <div class="empty-state">Đang tải...</div>
+          </div>
+          <div id="histSceneJobsPager"></div>
+        </div>
+      </div>
+
+      <footer class="site-foot">GreenLens Detection AI · chỉ là giao diện cục bộ</footer>
+    </div><!-- /wrap -->
+    </div><!-- /main-content -->
+    </div><!-- /app-shell -->
+
+    <script>
+      // ---- Section switcher (sidebar) ----
+      const _SECTIONS = ["overview", "yolo", "scene", "subtype", "merge", "convert", "split", "history"];
+
+      const _SUBTYPE_CLASSES = [
+        "HOUSEHOLD", "RECYCLABLE", "ORGANIC", "MEDICAL", "ELECTRONIC", "CONSTRUCTION", "HAZARDOUS",
+      ];
+      const _SUBTYPE_CLASS_VI = {
+        HOUSEHOLD: "Sinh hoạt",
+        RECYCLABLE: "Tái chế",
+        ORGANIC: "Hữu cơ",
+        MEDICAL: "Y tế",
+        ELECTRONIC: "Điện tử",
+        CONSTRUCTION: "Xây dựng",
+        HAZARDOUS: "Nguy hại",
+      };
+      const _SUBTYPE_STATUS_VI = {
+        QUEUED: "Đang chờ",
+        RUNNING: "Đang chạy",
+        SUCCEEDED: "Thành công",
+        FAILED: "Thất bại",
+        IDLE: "Rảnh",
+      };
+      function _subtypeClassOption(code) {
+        const vi = _SUBTYPE_CLASS_VI[code] || code;
+        return `${vi} (${code})`;
+      }
+      function _subtypeStatusVi(status) {
+        return _SUBTYPE_STATUS_VI[status] || status;
+      }
+      function switchSection(section) {
+        _SECTIONS.forEach(s => {
+          const el = document.getElementById("section" + s.charAt(0).toUpperCase() + s.slice(1));
+          if (el) el.classList.toggle("active", s === section);
+          const nav = document.getElementById("nav" + s.charAt(0).toUpperCase() + s.slice(1));
+          if (nav) nav.classList.toggle("active", s === section);
+        });
+        if (section === "overview") loadOverview();
+        if (section === "history") loadHistory();
+      }
+
+      // ---- Overview Dashboard ----
+      async function loadOverview() {
+        await Promise.all([loadYoloOverview(), loadSceneOverview()]);
+      }
+
+      function _fmtDate(iso) {
+        if (!iso) return "—";
+        try {
+          const d = new Date(iso);
+          return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "2-digit" }) +
+            " " + d.toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        } catch { return iso.slice(0, 16).replace("T", " "); }
+      }
+
+      function _statusPillHtml(status) {
+        return `<span class="jobs-status-pill ${status}">${status}</span>`;
+      }
+
+      const HIST_PAGE_SIZE = 10;
+      let histYoloPage = 0;
+      let histScenePage = 0;
+
+      function _parseJobListResponse(data) {
+        if (Array.isArray(data)) {
+          return { items: data, total: data.length, limit: data.length, offset: 0 };
+        }
+        return {
+          items: data.items || [],
+          total: data.total ?? (data.items || []).length,
+          limit: data.limit ?? (data.items || []).length,
+          offset: data.offset ?? 0,
+        };
+      }
+
+      function _sortJobsNewestFirst(list) {
+        return [...list].sort((a, b) => {
+          const ta = Date.parse(a.created_at || "") || 0;
+          const tb = Date.parse(b.created_at || "") || 0;
+          return tb - ta;
+        });
+      }
+
+      function _latestSucceededJob(list) {
+        return _sortJobsNewestFirst(list.filter(j => j.status === "SUCCEEDED"))[0] || null;
+      }
+
+      async function _fetchAllJobPages(urlBase) {
+        const all = [];
+        let offset = 0;
+        const limit = 50;
+        let total = 0;
+        do {
+          const resp = await fetch(`${urlBase}?limit=${limit}&offset=${offset}`);
+          if (!resp.ok) throw new Error("API error " + resp.status);
+          const page = _parseJobListResponse(await resp.json());
+          total = page.total;
+          all.push(...page.items);
+          offset += limit;
+        } while (offset < total);
+        return _sortJobsNewestFirst(all);
+      }
+
+      function _paginationHtml(page, total, pageSize, prevFn, nextFn) {
+        const totalPages = Math.max(1, Math.ceil(total / pageSize));
+        const current = page + 1;
+        const prevDisabled = page <= 0 ? "disabled" : "";
+        const nextDisabled = page >= totalPages - 1 ? "disabled" : "";
+        return `<div class="jobs-pagination">
+          <span>Mới nhất trước · trang ${current}/${totalPages} · ${total} job</span>
+          <span>
+            <button type="button" class="secondary" style="padding:0.35rem 0.75rem;font-size:0.8rem" ${prevDisabled} onclick="${prevFn}()">← Trước</button>
+            <button type="button" class="secondary" style="padding:0.35rem 0.75rem;font-size:0.8rem;margin-left:0.35rem" ${nextDisabled} onclick="${nextFn}()">Sau →</button>
+          </span>
+        </div>`;
+      }
+
+      function _jobDurationText(res) {
+        if (!res || res.duration_seconds == null) return "—";
+        const sec = res.duration_seconds;
+        if (sec >= 60) {
+          return `${Math.floor(sec / 60)}m${String(Math.round(sec % 60)).padStart(2, "0")}s`;
+        }
+        return `${Math.round(sec)}s`;
+      }
+
+      function _numStat(v) {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : 0;
+      }
+
+      /** Mỗi dataset_id chỉ lấy summary một lần (job mới nhất của dataset đó). */
+      function _uniqueDatasetSummaries(jobs) {
+        const map = new Map();
+        for (const j of _sortJobsNewestFirst(jobs)) {
+          const dsId = j.dataset_id;
+          if (!dsId || !j.dataset_summary || map.has(dsId)) continue;
+          map.set(dsId, j.dataset_summary);
+        }
+        return map;
+      }
+
+      function _aggregateYoloDatasetStats(jobs) {
+        const summaries = _uniqueDatasetSummaries(jobs);
+        let trainImages = 0;
+        let valImages = 0;
+        let trash = 0;
+        let water = 0;
+        for (const s of summaries.values()) {
+          const cc = s.class_counts ?? {};
+          trash += _numStat(cc["0"] ?? cc[0]);
+          water += _numStat(cc["1"] ?? cc[1]);
+          trainImages += _numStat(s.image_count);
+          valImages += _numStat(s.val_count ?? s.label_count);
+        }
+        return {
+          datasetCount: summaries.size,
+          trainImages,
+          valImages,
+          trash,
+          water,
+        };
+      }
+
+      function _aggregateSceneDatasetStats(jobs) {
+        const summaries = _uniqueDatasetSummaries(jobs);
+        let water = 0;
+        let smoke = 0;
+        let negative = 0;
+        let totalTrain = 0;
+        for (const s of summaries.values()) {
+          const tc = s.train_class_counts ?? {};
+          water += _numStat(tc.WATER);
+          negative += _numStat(tc.NEGATIVE);
+          totalTrain += _numStat(s.total_train_images);
+        }
+        return { datasetCount: summaries.size, water, negative, totalTrain };
+      }
+
+      function _applyYoloAggregateStats(agg) {
+        const has = agg.datasetCount > 0;
+        document.getElementById("yoloTrainImages").textContent = has ? agg.trainImages : "—";
+        document.getElementById("yoloValImages").textContent = has ? agg.valImages : "—";
+        document.getElementById("classTrash").textContent = has ? agg.trash : "—";
+        document.getElementById("classWater").textContent = has ? agg.water : "—";
+        document.getElementById("yoloDatasetNote").textContent = has
+          ? `Tổng hợp ${agg.datasetCount} dataset · ${agg.trainImages} ảnh train · ${agg.valImages} ảnh val · TRASH ${agg.trash} · WATER ${agg.water}`
+          : "";
+      }
+
+      function _applySceneAggregateStats(agg) {
+        const has = agg.datasetCount > 0;
+        document.getElementById("sceneWaterImages").textContent = has ? agg.water : "—";
+        const negEl = document.getElementById("sceneNegativeImages");
+        if (negEl) negEl.textContent = has ? agg.negative : "—";
+        const classRowEl = document.getElementById("sceneClassRow");
+        if (!has) {
+          classRowEl.innerHTML = `<span class="metrics-chip" style="color:var(--muted)">Chưa có dữ liệu</span>`;
+          return;
+        }
+        classRowEl.innerHTML = [
+          ["WATER", agg.water],
+          ["NEGATIVE", agg.negative],
+        ]
+          .map(([cls, cnt]) => `<span class="metrics-chip"><span>${cls}</span> ${cnt} ảnh</span>`)
+          .join("");
+      }
+
+      async function loadYoloOverview() {
+        const statusEl = document.getElementById("yoloModelStatus");
+        try {
+          const [pageResp, allJobs] = await Promise.all([
+            fetch("/api/v1/training/jobs?limit=50&offset=0"),
+            _fetchAllJobPages("/api/v1/training/jobs"),
+          ]);
+          if (!pageResp.ok) throw new Error("API error " + pageResp.status);
+          const page = _parseJobListResponse(await pageResp.json());
+          const jobList = _sortJobsNewestFirst(page.items);
+
+          _applyYoloAggregateStats(_aggregateYoloDatasetStats(allJobs));
+
+          document.getElementById("yoloTotalJobs").textContent = page.total;
+          const succeeded = jobList.filter(j => j.status === "SUCCEEDED");
+          const running = jobList.filter(j => j.status === "RUNNING");
+          const latestBase = _latestSucceededJob(jobList);
+
+          // Status dot
+          if (running.length > 0) {
+            statusEl.innerHTML = `<span class="status-dot yellow"></span> <span>Đang train — job <code>${running[0].job_id.slice(0,14)}</code></span>`;
+          } else if (latestBase) {
+            statusEl.innerHTML = `<span class="status-dot green"></span> <span>Sẵn sàng · lần train gần nhất <strong>${_fmtDate(latestBase.updated_at)}</strong></span>`;
+          } else if (jobList.length > 0) {
+            statusEl.innerHTML = `<span class="status-dot red"></span> <span>Chưa có job thành công</span>`;
+          } else {
+            statusEl.innerHTML = `<span class="status-dot gray"></span> <span>Chưa có lần train nào</span>`;
+          }
+
+          // Fetch full detail of latest succeeded to get metrics + dataset summary
+          if (latestBase) {
+            document.getElementById("yoloLatestEpochs").textContent = latestBase.epochs ?? "—";
+            document.getElementById("yoloLatestBatch").textContent = latestBase.batch ?? "—";
+            document.getElementById("yoloDatasetId").textContent = latestBase.dataset_id?.slice(0, 14) ?? "—";
+
+            try {
+              const detResp = await fetch(`/api/v1/training/jobs/${latestBase.job_id}`);
+              const detail = await detResp.json();
+
+              // Metrics from results.csv (parsed by backend)
+              const m = detail.metrics?.latest ?? {};
+              const fmt = v => (v == null ? "—" : parseFloat(v).toFixed(3));
+              document.getElementById("mMAP50").textContent     = fmt(m["metrics/mAP50(B)"]);
+              document.getElementById("mMAP5095").textContent   = fmt(m["metrics/mAP50-95(B)"]);
+              document.getElementById("mPrecision").textContent = fmt(m["metrics/precision(B)"]);
+              document.getElementById("mRecall").textContent    = fmt(m["metrics/recall(B)"]);
+            } catch {}
+          } else {
+            document.getElementById("yoloLatestEpochs").textContent = "—";
+            document.getElementById("yoloLatestBatch").textContent = "—";
+            document.getElementById("yoloDatasetId").textContent = "—";
+            ["mMAP50", "mMAP5095", "mPrecision", "mRecall"].forEach(id => {
+              document.getElementById(id).textContent = "—";
+            });
+          }
+
+          // Jobs history table — fetch detail for each job to get dataset_summary
+          const tableEl = document.getElementById("yoloJobsTable");
+          if (jobList.length === 0) {
+            tableEl.innerHTML = `<div class="empty-state">Chưa có job nào</div>`;
+          } else {
+            const displayJobs = jobList.slice(0, 8);
+            const rows = displayJobs.map(j => {
+              const res = j.result ?? {};
+              const dur = _jobDurationText(res);
+              const s = j.dataset_summary ?? {};
+              const cc = s.class_counts ?? {};
+              const totalImgs = s.image_count ?? "—";
+              const classDetail = Object.keys(cc).length
+                ? [
+                    cc["0"] != null ? `TRASH ${cc["0"]}` : null,
+                    cc["1"] != null ? `WATER ${cc["1"]}` : null,
+                  ].filter(Boolean).join(" · ")
+                : "—";
+              return `<tr>
+                <td title="${j.job_id}" style="font-family:var(--font-mono)">${j.job_id.slice(4,18)}</td>
+                <td>${_statusPillHtml(j.status)}</td>
+                <td>${j.epochs ?? "—"} ep</td>
+                <td>${j.batch ?? "—"}</td>
+                <td>${j.imgsz ?? "—"}</td>
+                <td><strong>${totalImgs}</strong> ảnh<br><small style="color:var(--muted)">${classDetail}</small></td>
+                <td>${_fmtDate(j.created_at)}</td>
+                <td>${dur}</td>
+              </tr>`;
+            }).join("");
+            tableEl.innerHTML = `<table>
+              <thead><tr><th>Job ID</th><th>Trạng thái</th><th>Epochs</th><th>Batch</th><th>Imgsz</th><th>Ảnh train</th><th>Ngày tạo</th><th>Thời gian</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+          }
+        } catch (e) {
+          statusEl.innerHTML = `<span class="status-dot red"></span> <span>Lỗi tải: ${e.message}</span>`;
+        }
+      }
+
+      async function loadSceneOverview() {
+        const statusEl = document.getElementById("sceneModelStatus");
+        try {
+          const [pageResp, allJobs] = await Promise.all([
+            fetch("/api/v1/training/scene/jobs?limit=50&offset=0"),
+            _fetchAllJobPages("/api/v1/training/scene/jobs"),
+          ]);
+          if (!pageResp.ok) throw new Error("API error " + pageResp.status);
+          const page = _parseJobListResponse(await pageResp.json());
+          const jobList = _sortJobsNewestFirst(page.items);
+
+          _applySceneAggregateStats(_aggregateSceneDatasetStats(allJobs));
+
+          document.getElementById("sceneTotalJobs").textContent = page.total;
+          const running = jobList.filter(j => j.status === "RUNNING");
+          const latest = _latestSucceededJob(jobList);
+
+          if (running.length > 0) {
+            statusEl.innerHTML = `<span class="status-dot yellow"></span> <span>Đang train — job <code>${running[0].job_id.slice(0,12)}...</code></span>`;
+          } else if (latest) {
+            statusEl.innerHTML = `<span class="status-dot green"></span> <span>Sẵn sàng · Weights từ <strong>${_fmtDate(latest.updated_at)}</strong></span>`;
+          } else if (jobList.length > 0) {
+            statusEl.innerHTML = `<span class="status-dot red"></span> <span>Chưa có job thành công</span>`;
+          } else {
+            statusEl.innerHTML = `<span class="status-dot gray"></span> <span>Chưa có lần train nào</span>`;
+          }
+
+          // Jobs table
+          const tableEl = document.getElementById("sceneJobsTable");
+          if (jobList.length === 0) {
+            tableEl.innerHTML = `<div class="empty-state">Chưa có job nào</div>`;
+          } else {
+            const displayJobs = jobList.slice(0, 6);
+            const rows = displayJobs.map(j => {
+              const res = j.result ?? {};
+              const dur = _jobDurationText(res);
+              const s = j.dataset_summary ?? {};
+              const tc = s.train_class_counts ?? {};
+              const totalImgs = s.total_train_images ?? "—";
+              const classDetail = Object.keys(tc).length
+                ? Object.entries(tc).map(([cls, cnt]) => `${cls} ${cnt}`).join(" · ")
+                : "—";
+              return `<tr>
+                <td title="${j.job_id}" style="font-family:var(--font-mono)">${j.job_id.slice(0, 14)}…</td>
+                <td>${_statusPillHtml(j.status)}</td>
+                <td>${j.epochs ?? "—"} ep</td>
+                <td>${j.lr ?? "—"}</td>
+                <td><strong>${totalImgs}</strong> ảnh<br><small style="color:var(--muted)">${classDetail}</small></td>
+                <td>${_fmtDate(j.created_at)}</td>
+                <td>${dur}</td>
+              </tr>`;
+            }).join("");
+            tableEl.innerHTML = `<table>
+              <thead><tr><th>Job ID</th><th>Trạng thái</th><th>Epochs</th><th>LR</th><th>Ảnh train</th><th>Ngày tạo</th><th>Thời gian</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+          }
+        } catch (e) {
+          statusEl.innerHTML = `<span class="status-dot red"></span> <span>Lỗi tải: ${e.message}</span>`;
+        }
+      }
+
+      function histYoloPrevPage() {
+        if (histYoloPage > 0) {
+          histYoloPage -= 1;
+          loadHistoryYoloJobs();
+        }
+      }
+
+      function histYoloNextPage() {
+        histYoloPage += 1;
+        loadHistoryYoloJobs();
+      }
+
+      function histScenePrevPage() {
+        if (histScenePage > 0) {
+          histScenePage -= 1;
+          loadHistorySceneJobs();
+        }
+      }
+
+      function histSceneNextPage() {
+        histScenePage += 1;
+        loadHistorySceneJobs();
+      }
+
+      function _renderYoloHistoryJobRows(jobs) {
+        return jobs.map(j => {
+          const res = j.result ?? {};
+          const s = j.dataset_summary ?? {};
+          const m = j.metrics?.latest ?? {};
+          const mAP = m["metrics/mAP50(B)"] ? parseFloat(m["metrics/mAP50(B)"]).toFixed(3) : "—";
+          return `<tr>
+            <td style="font-family:var(--font-mono)" title="${j.job_id}">${j.job_id.slice(4, 18)}</td>
+            <td>${_statusPillHtml(j.status)}</td>
+            <td><strong>${s.image_count ?? "—"}</strong> ảnh</td>
+            <td>${j.epochs ?? "—"} ep</td>
+            <td>${j.batch ?? "—"}</td>
+            <td>${j.imgsz ?? "—"}</td>
+            <td>${mAP}</td>
+            <td>${_fmtDate(j.created_at)}</td>
+            <td>${_jobDurationText(res)}</td>
+          </tr>`;
+        }).join("");
+      }
+
+      function _renderSceneHistoryJobRows(jobs) {
+        return jobs.map(j => {
+          const res = j.result ?? {};
+          const s = j.dataset_summary ?? {};
+          return `<tr>
+            <td style="font-family:var(--font-mono)" title="${j.job_id}">${j.job_id.slice(0, 16)}...</td>
+            <td>${_statusPillHtml(j.status)}</td>
+            <td><strong>${s.total_train_images ?? "—"}</strong> ảnh</td>
+            <td>${j.epochs ?? "—"} ep</td>
+            <td>${j.lr ?? "—"}</td>
+            <td>${_fmtDate(j.created_at)}</td>
+            <td>${_jobDurationText(res)}</td>
+          </tr>`;
+        }).join("");
+      }
+
+      async function loadHistoryYoloJobs() {
+        const yoloJobsEl = document.getElementById("histYoloJobsTable");
+        const pagerEl = document.getElementById("histYoloJobsPager");
+        yoloJobsEl.innerHTML = `<div class="empty-state">Đang tải...</div>`;
+        pagerEl.innerHTML = "";
+        try {
+          const offset = histYoloPage * HIST_PAGE_SIZE;
+          const resp = await fetch(`/api/v1/training/jobs?limit=${HIST_PAGE_SIZE}&offset=${offset}`);
+          if (!resp.ok) throw new Error("API error " + resp.status);
+          const page = _parseJobListResponse(await resp.json());
+          const jobs = _sortJobsNewestFirst(page.items);
+          if (jobs.length === 0 && page.total === 0) {
+            yoloJobsEl.innerHTML = `<div class="empty-state">Chưa có job nào</div>`;
+            return;
+          }
+          if (histYoloPage > 0 && jobs.length === 0) {
+            histYoloPage -= 1;
+            return loadHistoryYoloJobs();
+          }
+          yoloJobsEl.innerHTML = `<table>
+            <thead><tr><th>Job ID</th><th>Trạng thái</th><th>Ảnh train</th><th>Epochs</th><th>Batch</th><th>Imgsz</th><th>mAP50</th><th>Ngày tạo</th><th>Thời gian</th></tr></thead>
+            <tbody>${_renderYoloHistoryJobRows(jobs)}</tbody>
+          </table>`;
+          pagerEl.innerHTML = _paginationHtml(histYoloPage, page.total, HIST_PAGE_SIZE, "histYoloPrevPage", "histYoloNextPage");
+        } catch (e) {
+          yoloJobsEl.innerHTML = `<div class="empty-state">Lỗi: ${e.message}</div>`;
+        }
+      }
+
+      async function loadHistorySceneJobs() {
+        const sceneJobsEl = document.getElementById("histSceneJobsTable");
+        const pagerEl = document.getElementById("histSceneJobsPager");
+        sceneJobsEl.innerHTML = `<div class="empty-state">Đang tải...</div>`;
+        pagerEl.innerHTML = "";
+        try {
+          const offset = histScenePage * HIST_PAGE_SIZE;
+          const resp = await fetch(`/api/v1/training/scene/jobs?limit=${HIST_PAGE_SIZE}&offset=${offset}`);
+          if (!resp.ok) throw new Error("API error " + resp.status);
+          const page = _parseJobListResponse(await resp.json());
+          const jobs = _sortJobsNewestFirst(page.items);
+          if (jobs.length === 0 && page.total === 0) {
+            sceneJobsEl.innerHTML = `<div class="empty-state">Chưa có job nào</div>`;
+            return;
+          }
+          if (histScenePage > 0 && jobs.length === 0) {
+            histScenePage -= 1;
+            return loadHistorySceneJobs();
+          }
+          sceneJobsEl.innerHTML = `<table>
+            <thead><tr><th>Job ID</th><th>Trạng thái</th><th>Ảnh train</th><th>Epochs</th><th>LR</th><th>Ngày tạo</th><th>Thời gian</th></tr></thead>
+            <tbody>${_renderSceneHistoryJobRows(jobs)}</tbody>
+          </table>`;
+          pagerEl.innerHTML = _paginationHtml(histScenePage, page.total, HIST_PAGE_SIZE, "histScenePrevPage", "histSceneNextPage");
+        } catch (e) {
+          sceneJobsEl.innerHTML = `<div class="empty-state">Lỗi: ${e.message}</div>`;
+        }
+      }
+
+      // ---- History: Dữ liệu & Lịch sử ----
+      async function loadHistory() {
+        histYoloPage = 0;
+        histScenePage = 0;
+        try {
+          const [yoloMetaResp, sceneMetaResp, yoloAll, sceneAll] = await Promise.all([
+            fetch("/api/v1/training/jobs?limit=1&offset=0"),
+            fetch("/api/v1/training/scene/jobs?limit=1&offset=0"),
+            _fetchAllJobPages("/api/v1/training/jobs"),
+            _fetchAllJobPages("/api/v1/training/scene/jobs"),
+          ]);
+          const yoloMeta = _parseJobListResponse(await yoloMetaResp.json());
+          const sceneMeta = _parseJobListResponse(await sceneMetaResp.json());
+
+          const yoloDatasetIds = [...new Set(yoloAll.map(j => j.dataset_id).filter(Boolean))];
+          const sceneDatasetIds = [...new Set(sceneAll.map(j => j.dataset_id).filter(Boolean))];
+          document.getElementById("histYoloDatasets").textContent = yoloDatasetIds.length;
+          document.getElementById("histYoloJobs").textContent = yoloMeta.total;
+          document.getElementById("histSceneDatasets").textContent = sceneDatasetIds.length;
+          document.getElementById("histSceneJobs").textContent = sceneMeta.total;
+
+          // ---- YOLO Datasets table ----
+          const yoloDsMap = {};
+          yoloAll.forEach(j => {
+            const dsId = j.dataset_id;
+            if (!dsId || yoloDsMap[dsId]) return;
+            yoloDsMap[dsId] = j.dataset_summary ?? {};
+          });
+          const yoloDsEl = document.getElementById("histYoloDatasetsTable");
+          if (Object.keys(yoloDsMap).length === 0) {
+            yoloDsEl.innerHTML = `<div class="empty-state">Chưa có dataset nào</div>`;
+          } else {
+            const rows = Object.entries(yoloDsMap).map(([dsId, s]) => {
+              const cc = s.class_counts ?? {};
+              return `<tr>
+                <td style="font-family:var(--font-mono)">${dsId}</td>
+                <td><strong>${s.image_count ?? "—"}</strong> ảnh</td>
+                <td>${s.label_count ?? "—"} labels</td>
+                <td>🗑️ <strong>${cc["0"] ?? cc[0] ?? "—"}</strong></td>
+                <td>💧 <strong>${cc["1"] ?? cc[1] ?? "—"}</strong></td>
+              </tr>`;
+            }).join("");
+            yoloDsEl.innerHTML = `<table>
+              <thead><tr><th>Dataset ID</th><th>Tổng ảnh</th><th>Labels</th><th>TRASH</th><th>WATER</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+          }
+
+          await loadHistoryYoloJobs();
+
+          // ---- Scene Datasets table ----
+          const sceneDsMap = {};
+          sceneAll.forEach(j => {
+            const dsId = j.dataset_id;
+            if (!dsId || sceneDsMap[dsId]) return;
+            sceneDsMap[dsId] = j.dataset_summary ?? {};
+          });
+          const sceneDsEl = document.getElementById("histSceneDatasetsTable");
+          if (Object.keys(sceneDsMap).length === 0) {
+            sceneDsEl.innerHTML = `<div class="empty-state">Chưa có dataset nào</div>`;
+          } else {
+            const rows = Object.entries(sceneDsMap).map(([dsId, s]) => {
+              const tc = s.train_class_counts ?? {};
+              return `<tr>
+                <td style="font-family:var(--font-mono)">${dsId}</td>
+                <td><strong>${s.total_train_images ?? "—"}</strong> ảnh</td>
+                <td>WATER <strong>${tc["WATER"] ?? "—"}</strong></td>
+                <td>NEGATIVE <strong>${tc["NEGATIVE"] ?? "—"}</strong></td>
+              </tr>`;
+            }).join("");
+            sceneDsEl.innerHTML = `<table>
+              <thead><tr><th>Dataset ID</th><th>Tổng ảnh</th><th>WATER</th><th>NEGATIVE</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>`;
+          }
+
+          await loadHistorySceneJobs();
+
+
+        } catch (e) {
+          document.getElementById("histYoloDatasetsTable").innerHTML = `<div class="empty-state">Lỗi: ${e.message}</div>`;
+        }
+      }
+
+      // Auto-load on page open
+      loadOverview();
+
+      // ---- Legacy model switcher (kept for compatibility) ----
+      function switchModel(model) {
+        switchSection(model);
+      }
+
+      // ===== MODEL 1: YOLO =====
+      const uploadBtn = document.getElementById("uploadBtn");
+      const startBtn = document.getElementById("startBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const datasetResult = document.getElementById("datasetResult");
+      const jobResult = document.getElementById("jobResult");
+      const currentJobEl = document.getElementById("currentJob");
+      const jobStatusEl = document.getElementById("jobStatus");
+      const latestMetricEl = document.getElementById("latestMetric");
+      const logBox = document.getElementById("logBox");
+      const ckptAutoLatest = document.getElementById("ckptAutoLatest");
+      const ckptFromJob = document.getElementById("ckptFromJob");
+      const ckptExplicitPath = document.getElementById("ckptExplicitPath");
+      const continueFromJobIdEl = document.getElementById("continueFromJobId");
+      const modelPathEl = document.getElementById("modelPath");
+
+      let activeJobId = "";
+      let logOffset = 0;
+      let pollHandle = null;
+
+      function updateCheckpointFieldState() {
+        continueFromJobIdEl.disabled = !ckptFromJob.checked;
+        modelPathEl.disabled = !ckptExplicitPath.checked;
+      }
+      ckptAutoLatest.addEventListener("change", updateCheckpointFieldState);
+      ckptFromJob.addEventListener("change", updateCheckpointFieldState);
+      ckptExplicitPath.addEventListener("change", updateCheckpointFieldState);
+      updateCheckpointFieldState();
+
+      uploadBtn.onclick = async () => {
+        const f = document.getElementById("datasetZip").files[0];
+        if (!f) {
+          datasetResult.textContent = "Vui lòng chọn file ZIP.";
+          return;
+        }
+        const form = new FormData();
+        form.append("dataset_zip", f, f.name);
+        datasetResult.textContent = "Đang upload và chuẩn hóa…";
+        try {
+          const resp = await fetch("/api/v1/training/datasets/upload", { method: "POST", body: form });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Upload failed");
+          datasetResult.textContent = `OK — dataset_id=${data.dataset_id} | ảnh=${data.summary.image_count} | nhãn=${data.summary.label_count} | invalid_lines=${data.summary.invalid_lines}`;
+          document.getElementById("datasetId").value = data.dataset_id;
+        } catch (err) {
+          datasetResult.textContent = `Lỗi upload: ${err.message}`;
+        }
+      };
+
+      startBtn.onclick = async () => {
+        const ckptMode = document.querySelector("input[name='ckptMode']:checked")?.value || "auto_latest";
+        const continueFromJobId = continueFromJobIdEl.value.trim();
+        const modelPath = modelPathEl.value.trim();
+        const body = {
+          dataset_id: document.getElementById("datasetId").value.trim(),
+          run_name: document.getElementById("runName").value.trim() || "pollution_detect",
+          epochs: Number(document.getElementById("epochs").value),
+          batch: Number(document.getElementById("batch").value),
+          imgsz: Number(document.getElementById("imgsz").value),
+          model_path: null,
+          continue_from_latest: ckptMode === "auto_latest",
+          continue_from_job_id: null,
+          enable_wandb: document.getElementById("wandbEnabled").checked,
+          wandb_project: document.getElementById("wandbProject").value.trim() || null,
+          wandb_entity: document.getElementById("wandbEntity").value.trim() || null,
+          wandb_api_key: document.getElementById("wandbKey").value.trim() || null,
+        };
+        if (ckptMode === "from_job") {
+          if (!continueFromJobId) {
+            jobResult.textContent = "Đã chọn tiếp tục theo job_id — nhập job_id.";
+            return;
+          }
+          body.continue_from_job_id = continueFromJobId;
+        } else if (ckptMode === "explicit_path") {
+          if (!modelPath) {
+            jobResult.textContent = "Đã chọn model_path — nhập đường dẫn .pt.";
+            return;
+          }
+          body.model_path = modelPath;
+        }
+        jobResult.textContent = "Đang tạo training job…";
+        try {
+          const resp = await fetch("/api/v1/training/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Create job failed");
+          activeJobId = data.job_id;
+          currentJobEl.textContent = activeJobId;
+          jobResult.textContent = `Đã tạo job: ${data.job_id} (${data.status})`;
+          logOffset = 0;
+          logBox.textContent = "";
+          stopBtn.style.display = "";
+          beginPolling();
+        } catch (err) {
+          jobResult.textContent = `Tạo job lỗi: ${err.message}`;
+        }
+      };
+
+      stopBtn.onclick = async () => {
+        if (!activeJobId) return;
+        if (!confirm(`Dừng job ${activeJobId}?`)) return;
+        try {
+          const resp = await fetch(`/api/v1/training/jobs/${activeJobId}/stop`, { method: "POST" });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Stop failed");
+          jobResult.textContent = `Đã dừng job: ${activeJobId}`;
+          setStatusPill(jobStatusEl, "FAILED");
+          stopBtn.style.display = "none";
+          if (pollHandle) { window.clearInterval(pollHandle); pollHandle = null; }
+        } catch (err) {
+          jobResult.textContent = `Lỗi stop: ${err.message}`;
+        }
+      };
+
+      function setStatusPill(el, status) {
+        el.textContent = status;
+        el.className = "pill";
+        el.style.background = "";
+        el.style.color = "";
+        if (status === "SUCCEEDED") el.classList.add("ok-pill");
+        else if (status === "FAILED") { el.style.background = "#fef2f2"; el.style.color = "#b91c1c"; }
+        else if (status === "RUNNING") { el.style.background = "#eff6ff"; el.style.color = "#1d4ed8"; }
+        else if (status === "QUEUED") { el.style.background = "#fffbeb"; el.style.color = "#92400e"; }
+      }
+
+      function beginPolling() {
+        if (pollHandle) window.clearInterval(pollHandle);
+        pollHandle = window.setInterval(async () => {
+          if (!activeJobId) return;
+          try {
+            const [jobResp, logResp] = await Promise.all([
+              fetch(`/api/v1/training/jobs/${activeJobId}`),
+              fetch(`/api/v1/training/jobs/${activeJobId}/logs?offset=${logOffset}&limit=4000`),
+            ]);
+            const job = await jobResp.json();
+            const log = await logResp.json();
+            if (!jobResp.ok) throw new Error(job.detail || "job fetch failed");
+            if (!logResp.ok) throw new Error(log.detail || "log fetch failed");
+            setStatusPill(jobStatusEl, job.status);
+            if (job.metrics && job.metrics.latest) {
+              latestMetricEl.textContent = JSON.stringify(job.metrics.latest);
+            }
+            if (log.content) {
+              logBox.textContent += log.content;
+              logBox.scrollTop = logBox.scrollHeight;
+            }
+            logOffset = log.next_offset || logOffset;
+            if (job.status === "SUCCEEDED" || job.status === "FAILED") {
+              if (job.result) {
+                jobResult.textContent = `Hoàn thành: ${job.status} | best=${job.result.best_model_path || "n/a"} | csv=${job.result.results_csv || "n/a"}`;
+              }
+              stopBtn.style.display = "none";
+              window.clearInterval(pollHandle);
+              pollHandle = null;
+            }
+          } catch (err) {
+            jobResult.textContent = `Poll lỗi: ${err.message}`;
+          }
+        }, 2000);
+      }
+
+      // ===== MODEL 2: SCENE CLASSIFIER =====
+      let sceneActiveJobId = "";
+      let sceneLogOffset = 0;
+      let scenePollHandle = null;
+
+      document.getElementById("sceneUploadBtn").onclick = async () => {
+        const f = document.getElementById("sceneDatasetZip").files[0];
+        const resultEl = document.getElementById("sceneDatasetResult");
+        if (!f) { resultEl.textContent = "Vui lòng chọn file ZIP."; return; }
+        const form = new FormData();
+        form.append("dataset_zip", f, f.name);
+        resultEl.textContent = "Đang upload và kiểm tra…";
+        try {
+          const resp = await fetch("/api/v1/training/scene/datasets/upload", { method: "POST", body: form });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Upload failed");
+          const s = data.summary;
+          const trainCounts = Object.entries(s.train_class_counts || {}).map(([k,v]) => `${k}=${v}`).join(", ");
+          resultEl.textContent = `OK — dataset_id=${data.dataset_id} | train: ${trainCounts} | tổng=${s.total_train_images}`;
+          document.getElementById("sceneDatasetId").value = data.dataset_id;
+        } catch (err) {
+          resultEl.textContent = `Lỗi upload: ${err.message}`;
+        }
+      };
+
+      document.getElementById("sceneStartBtn").onclick = async () => {
+        const resultEl = document.getElementById("sceneJobResult");
+        const body = {
+          dataset_id: document.getElementById("sceneDatasetId").value.trim(),
+          run_name: document.getElementById("sceneRunName").value.trim() || "scene_classifier",
+          epochs: Number(document.getElementById("sceneEpochs").value),
+          batch: Number(document.getElementById("sceneBatch").value),
+          lr: Number(document.getElementById("sceneLr").value),
+          output_path: document.getElementById("sceneOutputPath").value.trim() || null,
+        };
+        if (!body.dataset_id) { resultEl.textContent = "Nhập dataset_id trước."; return; }
+        resultEl.textContent = "Đang tạo training job…";
+        try {
+          const resp = await fetch("/api/v1/training/scene/jobs", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Create job failed");
+          sceneActiveJobId = data.job_id;
+          document.getElementById("sceneCurrentJob").textContent = sceneActiveJobId;
+          resultEl.textContent = `Đã tạo job: ${data.job_id} (${data.status})`;
+          sceneLogOffset = 0;
+          document.getElementById("sceneLogBox").textContent = "";
+          beginScenePolling();
+        } catch (err) {
+          resultEl.textContent = `Tạo job lỗi: ${err.message}`;
+        }
+      };
+
+      function beginScenePolling() {
+        if (scenePollHandle) window.clearInterval(scenePollHandle);
+        scenePollHandle = window.setInterval(async () => {
+          if (!sceneActiveJobId) return;
+          try {
+            const [jobResp, logResp] = await Promise.all([
+              fetch(`/api/v1/training/scene/jobs/${sceneActiveJobId}`),
+              fetch(`/api/v1/training/scene/jobs/${sceneActiveJobId}/logs?offset=${sceneLogOffset}&limit=4000`),
+            ]);
+            const job = await jobResp.json();
+            const log = await logResp.json();
+            if (!jobResp.ok) throw new Error(job.detail || "job fetch failed");
+            if (!logResp.ok) throw new Error(log.detail || "log fetch failed");
+            setStatusPill(document.getElementById("sceneJobStatus"), job.status);
+            if (log.content) {
+              document.getElementById("sceneLogBox").textContent += log.content;
+              document.getElementById("sceneLogBox").scrollTop = document.getElementById("sceneLogBox").scrollHeight;
+            }
+            sceneLogOffset = log.next_offset || sceneLogOffset;
+            if (job.status === "SUCCEEDED" || job.status === "FAILED") {
+              const resultEl = document.getElementById("sceneJobResult");
+              if (job.result) {
+                resultEl.textContent = `Hoàn thành: ${job.status} | output=${job.result.output_path || job.output_path}`;
+                document.getElementById("sceneResultPath").textContent =
+                  job.status === "SUCCEEDED"
+                    ? `Set SCENE_CLASSIFIER_PATH=${job.result.output_path || job.output_path}`
+                    : "";
+              }
+              window.clearInterval(scenePollHandle);
+              scenePollHandle = null;
+            }
+          } catch (err) {
+            document.getElementById("sceneJobResult").textContent = `Poll lỗi: ${err.message}`;
+          }
+        }, 2000);
+      }
+      // ===== RESTRUCTURE DATASET =====
+      document.getElementById("restructureBtn").onclick = async () => {
+        const f = document.getElementById("restructureZip").files[0];
+        const resultEl = document.getElementById("restructureResult");
+        if (!f) { resultEl.textContent = "Vui lòng chọn file ZIP."; return; }
+        const valFrac = parseFloat(document.getElementById("restructureValFrac").value) || 0.15;
+        const testFrac = parseFloat(document.getElementById("restructureTestFrac").value) || 0.15;
+        resultEl.textContent = "Đang convert cấu trúc…";
+        const form = new FormData();
+        form.append("dataset_zip", f, f.name);
+        try {
+          const resp = await fetch(`/api/v1/training/datasets/restructure?val_fraction=${valFrac}&test_fraction=${testFrac}`, { method: "POST", body: form });
+          if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || "Restructure failed");
+          }
+          const statsRaw = resp.headers.get("X-Stats");
+          const stats = statsRaw ? JSON.parse(statsRaw) : {};
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const outName = f.name.replace(/\.zip$/i, "") + "_structured.zip";
+          a.href = url; a.download = outName; a.click();
+          URL.revokeObjectURL(url);
+          resultEl.textContent = `Download xong: ${outName} | train=${stats.train_images} / val=${stats.val_images} / test=${stats.test_images} ảnh | labels=${stats.train_labels+stats.val_labels+stats.test_labels} | no_label=${stats.no_label} → upload vào tab Model 1 để train.`;
+        } catch (err) {
+          resultEl.textContent = `Lỗi: ${err.message}`;
+        }
+      };
+
+      // ===== CONVERT DATASET =====
+      let _inspectedClasses = {};  // {0: "Plastic Trash", 1: "bottle", ...}
+
+      document.getElementById("inspectBtn").onclick = async () => {
+        const f = document.getElementById("convertZip").files[0];
+        const resultEl = document.getElementById("inspectResult");
+        if (!f) { resultEl.textContent = "Vui lòng chọn file ZIP."; return; }
+        const form = new FormData();
+        form.append("dataset_zip", f, f.name);
+        resultEl.textContent = "Đang đọc class names…";
+        try {
+          const resp = await fetch("/api/v1/training/datasets/inspect", { method: "POST", body: form });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.detail || "Inspect failed");
+          _inspectedClasses = data.detected_classes;  // {"0": "Plastic Trash", ...}
+          const count = Object.keys(_inspectedClasses).length;
+          resultEl.textContent = `Tìm thấy ${count} class${data.yaml_file ? " từ " + data.yaml_file : ""}`;
+          _buildMappingRows(_inspectedClasses);
+          document.getElementById("mappingCard").style.display = "";
+        } catch (err) {
+          resultEl.textContent = `Lỗi: ${err.message}`;
+        }
+      };
+
+      function _buildMappingRows(classes) {
+        const container = document.getElementById("mappingRows");
+        container.innerHTML = "";
+        const targets = ["TRASH", "WATER", "SKIP"];
+        const CLASS_COLORS = {
+          TRASH: "#059669",
+          WATER: "#1d4ed8",
+          SKIP: "#94a3b8",
+        };
+        Object.entries(classes).forEach(([id, name]) => {
+          const row = document.createElement("div");
+          row.style.cssText = "display:flex;align-items:center;gap:0.75rem;flex-wrap:wrap;padding:0.45rem 0.6rem;border-radius:10px;background:rgba(248,250,252,0.7);border:1px solid rgba(15,23,42,0.07)";
+
+          const label = document.createElement("span");
+          label.style.cssText = "font-size:0.875rem;font-weight:700;min-width:220px;color:#0f172a";
+          label.innerHTML = `<code style="font-size:0.75rem;background:rgba(14,165,233,0.1);color:#0c4a6e;padding:0.1rem 0.35rem;border-radius:5px">${id}</code> ${name}`;
+
+          const sel = document.createElement("select");
+          sel.id = `map_${id}`;
+          sel.style.cssText = "padding:0.42rem 0.7rem;border-radius:8px;border:1.5px solid #e2e8f0;font-weight:700;font-size:0.85rem;background:#fff;min-width:120px;cursor:pointer";
+
+          const n = name.toLowerCase();
+          let autoTarget = "SKIP";
+          if (n.includes("trash") || n.includes("waste") || n.includes("plastic") || n.includes("bottle") || n.includes("litter") || n.includes("garbage") || n.includes("packaging") || n.includes("can") || n.includes("paper") || n.includes("rubbish") || n.includes("bag") || n.includes("cup")) {
+            autoTarget = "TRASH";
+          } else if (n.includes("water") || n.includes("sewage") || n.includes("effluent") || n.includes("oil") || n.includes("foam") || n.includes("river") || n.includes("pond") || n.includes("lake") || n.includes("drain")) {
+            autoTarget = "WATER";
+          }
+
+          targets.forEach(t => {
+            const opt = document.createElement("option");
+            opt.value = t;
+            opt.textContent = t === "SKIP" ? "— SKIP (bỏ qua)" : `→ ${t}`;
+            if (t === autoTarget) opt.selected = true;
+            sel.appendChild(opt);
+          });
+
+          // Color the select border based on selection
+          function updateSelColor() {
+            const c = CLASS_COLORS[sel.value] || "#e2e8f0";
+            sel.style.borderColor = c;
+            sel.style.color = c;
+          }
+          sel.addEventListener("change", updateSelColor);
+          updateSelColor();
+
+          // Badge showing auto-suggestion reason
+          const hint = document.createElement("span");
+          hint.style.cssText = "font-size:0.72rem;color:var(--muted);font-weight:600";
+          hint.textContent = autoTarget !== "SKIP" ? `✓ tự động gợi ý ${autoTarget}` : "→ chọn thủ công";
+
+          row.appendChild(label);
+          row.appendChild(sel);
+          row.appendChild(hint);
+          container.appendChild(row);
+        });
+      }
+
+      document.getElementById("convertBtn").onclick = async () => {
+        const f = document.getElementById("convertZip").files[0];
+        const resultEl = document.getElementById("convertResult");
+        if (!f) { resultEl.textContent = "Vui lòng chọn file ZIP."; return; }
+
+        // Build mapping from selects
+        const mapping = {};
+        Object.entries(_inspectedClasses).forEach(([id, name]) => {
+          const sel = document.getElementById(`map_${id}`);
+          if (sel && sel.value !== "SKIP") {
+            mapping[name] = sel.value;  // "Plastic Trash" -> "TRASH"
+          }
+        });
+
+        if (Object.keys(mapping).length === 0) {
+          resultEl.textContent = "Không có class nào được map (tất cả SKIP).";
+          return;
+        }
+
+        resultEl.textContent = "Đang convert…";
+        const form = new FormData();
+        form.append("dataset_zip", f, f.name);
+        form.append("mapping_json", JSON.stringify(mapping));
+        try {
+          const resp = await fetch("/api/v1/training/datasets/convert", { method: "POST", body: form });
+          if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.detail || "Convert failed");
+          }
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const outName = f.name.replace(/\.zip$/i, "") + "_converted.zip";
+          a.href = url;
+          a.download = outName;
+          a.click();
+          URL.revokeObjectURL(url);
+          resultEl.textContent = `Download xong: ${outName} — upload vào tab Model 1 để train.`;
+        } catch (err) {
+          resultEl.textContent = `Lỗi convert: ${err.message}`;
+        }
+      };
+
+      // ===== FILTER CLASSES =====
+      (function () {
+        let _filterClasses = {};   // { "0": "Garbage", "1": "Not Garbage", ... }
+
+        const zipInput     = document.getElementById("filterZipInput");
+        const scanBtn      = document.getElementById("filterScanBtn");
+        const scanResult   = document.getElementById("filterScanResult");
+        const classList    = document.getElementById("filterClassList");
+        const checkboxWrap = document.getElementById("filterCheckboxes");
+        const selectAll    = document.getElementById("filterSelectAll");
+        const selectNone   = document.getElementById("filterSelectNone");
+        const runBtn       = document.getElementById("filterRunBtn");
+        const runResult    = document.getElementById("filterRunResult");
+
+        function _resetUI() {
+          classList.style.display = "none";
+          runBtn.style.display = "none";
+          checkboxWrap.innerHTML = "";
+          scanResult.textContent = "";
+          runResult.textContent = "";
+          _filterClasses = {};
+        }
+
+        zipInput.addEventListener("change", _resetUI);
+
+        scanBtn.addEventListener("click", async () => {
+          const f = zipInput.files[0];
+          if (!f) { scanResult.textContent = "Vui lòng chọn file ZIP."; return; }
+          scanBtn.disabled = true;
+          scanResult.textContent = "Đang đọc class names…";
+          _resetUI();
+          zipInput.value && (zipInput.dataset._f = "1"); // keep file ref
+
+          const form = new FormData();
+          form.append("dataset_zip", f, f.name);
+          try {
+            const resp = await fetch("/api/v1/training/datasets/inspect", { method: "POST", body: form });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || "Inspect failed");
+
+            _filterClasses = data.detected_classes; // {"0":"Garbage","1":"Not Garbage",...}
+            const count = Object.keys(_filterClasses).length;
+            if (count === 0) { scanResult.textContent = "Không tìm thấy class nào trong ZIP."; return; }
+
+            scanResult.textContent = `Tìm thấy ${count} class${data.yaml_file ? " từ " + data.yaml_file : ""}.`;
+
+            // Build checkboxes — default: all checked
+            checkboxWrap.innerHTML = "";
+            Object.entries(_filterClasses).forEach(([id, name]) => {
+              const label = document.createElement("label");
+              label.style.cssText = "display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;font-weight:600;cursor:pointer";
+              const cb = document.createElement("input");
+              cb.type = "checkbox";
+              cb.id = `fcb_${id}`;
+              cb.value = id;
+              cb.checked = true;
+              cb.style.cssText = "width:1rem;height:1rem;accent-color:var(--brand);cursor:pointer";
+              const badge = document.createElement("span");
+              badge.style.cssText = "background:rgba(5,150,105,0.1);color:var(--brand-deep);border-radius:6px;padding:0.1rem 0.45rem;font-family:var(--font-mono);font-size:0.78rem";
+              badge.textContent = `id:${id}`;
+              const nameSp = document.createElement("span");
+              nameSp.textContent = name;
+              label.append(cb, badge, nameSp);
+              checkboxWrap.appendChild(label);
+            });
+
+            classList.style.display = "";
+            runBtn.style.display = "";
+          } catch (err) {
+            scanResult.textContent = `Lỗi: ${err.message}`;
+          } finally {
+            scanBtn.disabled = false;
+          }
+        });
+
+        selectAll.addEventListener("click", () =>
+          checkboxWrap.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = true));
+        selectNone.addEventListener("click", () =>
+          checkboxWrap.querySelectorAll("input[type=checkbox]").forEach(cb => cb.checked = false));
+
+        runBtn.addEventListener("click", async () => {
+          const f = zipInput.files[0];
+          if (!f) { runResult.textContent = "Vui lòng chọn file ZIP."; return; }
+
+          const keepIds = [...checkboxWrap.querySelectorAll("input[type=checkbox]:checked")]
+            .map(cb => parseInt(cb.value, 10));
+          if (keepIds.length === 0) {
+            runResult.textContent = "Phải chọn ít nhất 1 class để giữ lại.";
+            return;
+          }
+          const totalClasses = Object.keys(_filterClasses).length;
+          if (keepIds.length === totalClasses) {
+            runResult.textContent = "Tất cả class đều được giữ — không có gì để lọc.";
+            return;
+          }
+
+          runBtn.disabled = true;
+          runResult.textContent = "Đang lọc dataset… (file lớn có thể mất vài giây)";
+
+          const form = new FormData();
+          form.append("dataset_zip", f, f.name);
+          form.append("keep_ids_json", JSON.stringify(keepIds));
+
+          try {
+            const resp = await fetch("/api/v1/training/datasets/filter-classes", {
+              method: "POST", body: form,
+            });
+            if (!resp.ok) {
+              const err = await resp.json().catch(() => ({}));
+              throw new Error(err.detail || `Server error ${resp.status}`);
+            }
+            const statsRaw = resp.headers.get("X-Stats");
+            const st = statsRaw ? JSON.parse(statsRaw) : {};
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const baseName = f.name.replace(/\.zip$/i, "");
+            a.href = url;
+            a.download = `${baseName}_filtered.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            runResult.innerHTML =
+              `Download xong: <strong>${baseName}_filtered.zip</strong><br/>` +
+              `Giữ lại: ${st.kept_images ?? "?"} ảnh · ` +
+              `Đã xóa: ${st.dropped_images ?? "?"} ảnh · ` +
+              `Annotation giữ: ${st.kept_annotations ?? "?"} · ` +
+              `Annotation xóa: ${st.dropped_annotations ?? "?"}`;
+          } catch (err) {
+            runResult.textContent = `Lỗi: ${err.message}`;
+          } finally {
+            runBtn.disabled = false;
+          }
+        });
+      })();
+
+      // ===== SPLIT DATASET =====
+      (function () {
+        const zipInput   = document.getElementById("splitZipInput");
+        const countInput = document.getElementById("splitCountInput");
+        const infoBar    = document.getElementById("splitInfoBar");
+        const infoText   = document.getElementById("splitInfoText");
+        const splitBtn   = document.getElementById("splitBtn");
+        const resultEl   = document.getElementById("splitResult");
+
+        // When user picks a file, scan the ZIP to count images and update info bar
+        zipInput.addEventListener("change", async () => {
+          const f = zipInput.files[0];
+          infoBar.style.display = "none";
+          splitBtn.disabled = true;
+          resultEl.textContent = "";
+          if (!f) return;
+
+          // Count entries ending in image extensions using JSZip-free approach:
+          // read as ArrayBuffer then scan the central directory via ZipFile API in browser
+          // Simple approach: count via filename pattern in the raw bytes
+          try {
+            const buf = await f.arrayBuffer();
+            const bytes = new Uint8Array(buf);
+            // Count image extensions in the local file header names
+            const text = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+            const imgExts = [".jpg", ".jpeg", ".png", ".bmp", ".webp", ".tiff"];
+            let imgCount = 0;
+            // Use a rough count by scanning PK\x03\x04 local file headers
+            const matches = text.matchAll(/\.(?:jpe?g|png|bmp|webp|tiff)/gi);
+            for (const _ of matches) imgCount++;
+            // Rough dedup estimate (zip may double-count paths with dirs)
+            imgCount = Math.max(1, imgCount);
+            infoText.textContent = `Phát hiện khoảng ${imgCount} ảnh trong ZIP · Nhập số muốn tách (1 – ${imgCount - 1})`;
+            countInput.max = imgCount - 1;
+            infoBar.style.display = "";
+            splitBtn.disabled = false;
+          } catch {
+            infoText.textContent = "Không đọc được ZIP — hãy thử upload và tách luôn.";
+            infoBar.style.display = "";
+            splitBtn.disabled = false;
+          }
+        });
+
+        splitBtn.addEventListener("click", async () => {
+          const f = zipInput.files[0];
+          if (!f) { resultEl.textContent = "Vui lòng chọn file ZIP."; return; }
+          const count = parseInt(countInput.value, 10);
+          if (!count || count < 1) { resultEl.textContent = "Số ảnh phải >= 1."; return; }
+
+          splitBtn.disabled = true;
+          resultEl.textContent = "Đang tách dataset… (file lớn có thể mất vài giây)";
+
+          const form = new FormData();
+          form.append("dataset_zip", f, f.name);
+          form.append("split_count", count);
+
+          try {
+            const resp = await fetch(`/api/v1/training/datasets/split?split_count=${count}`, {
+              method: "POST",
+              body: form,
+            });
+            if (!resp.ok) {
+              const err = await resp.json().catch(() => ({}));
+              throw new Error(err.detail || `Server error ${resp.status}`);
+            }
+            const statsRaw = resp.headers.get("X-Stats");
+            const stats = statsRaw ? JSON.parse(statsRaw) : {};
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const baseName = f.name.replace(/\.zip$/i, "");
+            a.href = url;
+            a.download = `${baseName}_split_bundle.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            resultEl.innerHTML =
+              `Download xong: <strong>${baseName}_split_bundle.zip</strong><br/>` +
+              `📦 Bên trong có 2 file ZIP:<br/>` +
+              `&nbsp;&nbsp;• <code>${baseName}_split_${stats.split_images ?? count}.zip</code> — ${stats.split_images ?? count} ảnh + ${stats.split_paired_labels ?? "?"} label<br/>` +
+              `&nbsp;&nbsp;• <code>${baseName}_remainder_${stats.remainder_images ?? "?"}.zip</code> — ${stats.remainder_images ?? "?"} ảnh + ${stats.remainder_paired_labels ?? "?"} label`;
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          } finally {
+            splitBtn.disabled = false;
+          }
+        });
+      })();
+
+      // ===== TRASH SUBTYPE (merge + train) =====
+      (function () {
+        const listEl = document.getElementById("subtypeZipClassList");
+        const zipInput = document.getElementById("subtypeZipInput");
+        const countEl = document.getElementById("subtypeZipCount");
+        /** @type {{ id: string, file: File, class: string }[]} */
+        let subtypeZipQueue = [];
+        let subtypeZipIdSeq = 0;
+
+        function renderSubtypeZipRows() {
+          countEl.textContent = `${subtypeZipQueue.length} tệp ZIP`;
+          if (subtypeZipQueue.length === 0) {
+            listEl.innerHTML = `<p style="margin:0;font-size:0.82rem;color:var(--muted)">Chưa có ZIP — chọn file ở ô «Thêm file ZIP» phía trên.</p>`;
+            return;
+          }
+          let html = `<table style="width:100%;font-size:0.82rem;border-collapse:collapse">`;
+          html += `<tr><th style="text-align:left;padding:0.35rem">Tệp ZIP</th><th style="text-align:left;padding:0.35rem">Loại rác</th><th style="width:4rem;padding:0.35rem">Xóa</th></tr>`;
+          for (const entry of subtypeZipQueue) {
+            const selected = _SUBTYPE_CLASSES.map(
+              (c) => `<option value="${c}"${c === entry.class ? " selected" : ""}>${_subtypeClassOption(c)}</option>`
+            ).join("");
+            html += `<tr data-subtype-id="${entry.id}">`;
+            html += `<td style="padding:0.35rem;word-break:break-all">${entry.file.name}</td>`;
+            html += `<td style="padding:0.35rem"><select class="subtype-class-pick" data-id="${entry.id}" style="width:100%;padding:0.35rem">${selected}</select></td>`;
+            html += `<td style="padding:0.35rem;text-align:center"><button type="button" class="subtype-remove-zip secondary" data-id="${entry.id}" title="Xóa ZIP này" style="font-size:0.75rem;padding:0.25rem 0.45rem">✕</button></td>`;
+            html += `</tr>`;
+          }
+          html += `</table>`;
+          listEl.innerHTML = html;
+
+          listEl.querySelectorAll(".subtype-class-pick").forEach((sel) => {
+            sel.addEventListener("change", () => {
+              const id = sel.getAttribute("data-id");
+              const item = subtypeZipQueue.find((e) => e.id === id);
+              if (item) item.class = sel.value;
+            });
+          });
+          listEl.querySelectorAll(".subtype-remove-zip").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-id");
+              subtypeZipQueue = subtypeZipQueue.filter((e) => e.id !== id);
+              renderSubtypeZipRows();
+            });
+          });
+        }
+
+        zipInput.addEventListener("change", () => {
+          const picked = zipInput.files;
+          if (!picked || picked.length === 0) return;
+          for (let i = 0; i < picked.length; i++) {
+            subtypeZipQueue.push({
+              id: `sz_${++subtypeZipIdSeq}`,
+              file: picked[i],
+              class: "HOUSEHOLD",
+            });
+          }
+          zipInput.value = "";
+          renderSubtypeZipRows();
+        });
+
+        document.getElementById("subtypeClearAllZips").onclick = () => {
+          subtypeZipQueue = [];
+          zipInput.value = "";
+          renderSubtypeZipRows();
+        };
+
+        renderSubtypeZipRows();
+
+        document.getElementById("subtypeMergeBtn").onclick = async () => {
+          const resultEl = document.getElementById("subtypeMergeResult");
+          if (subtypeZipQueue.length === 0) {
+            resultEl.textContent = "Chọn ít nhất 1 file ZIP.";
+            return;
+          }
+          listEl.querySelectorAll(".subtype-class-pick").forEach((sel) => {
+            const id = sel.getAttribute("data-id");
+            const item = subtypeZipQueue.find((e) => e.id === id);
+            if (item) item.class = sel.value;
+          });
+          const form = new FormData();
+          const classes = subtypeZipQueue.map((e) => e.class);
+          for (const entry of subtypeZipQueue) {
+            form.append("zips", entry.file, entry.file.name);
+          }
+          form.append("classes_json", JSON.stringify(classes));
+          form.append("val_fraction", String(Number(document.getElementById("subtypeValFraction").value) || 0.15));
+          form.append("also_register", document.getElementById("subtypeAlsoRegister").checked ? "true" : "false");
+
+          resultEl.textContent = "Đang gộp…";
+          try {
+            const resp = await fetch("/api/v1/training/subtype/datasets/merge-zips", {
+              method: "POST",
+              body: form,
+            });
+            if (!resp.ok) {
+              const err = await resp.json().catch(() => ({}));
+              throw new Error(err.detail || `HTTP ${resp.status}`);
+            }
+            const statsRaw = resp.headers.get("X-Stats");
+            const stats = statsRaw ? JSON.parse(statsRaw) : {};
+            const dsId = resp.headers.get("X-Dataset-Id");
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "trash_subtype_merged.zip";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            const tc = stats.train_class_counts || {};
+            const vc = stats.val_class_counts || {};
+            let summary = `✅ Đã tải <code>trash_subtype_merged.zip</code><br/>`;
+            summary += `Tổng: <strong>${stats.total_train}</strong> ảnh train · <strong>${stats.total_val}</strong> ảnh val<br/>`;
+            _SUBTYPE_CLASSES.forEach((c) => {
+              if ((tc[c] || 0) + (vc[c] || 0) > 0) {
+                summary += `${_subtypeClassOption(c)}: train ${tc[c] || 0} · val ${vc[c] || 0}<br/>`;
+              }
+            });
+            if (dsId) {
+              document.getElementById("subtypeDatasetId").value = dsId;
+              summary += `<br/>Mã dataset: <code>${dsId}</code> — xuống bước 3 bấm «Bắt đầu huấn luyện».`;
+            } else {
+              summary += `<br/>Chưa lưu trên server — tải ZIP lên lại ở bước 2 nếu cần train tại đây.`;
+            }
+            resultEl.innerHTML = summary;
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          }
+        };
+
+        document.getElementById("subtypeUploadBtn").onclick = async () => {
+          const f = document.getElementById("subtypeDatasetZip").files[0];
+          const resultEl = document.getElementById("subtypeDatasetResult");
+          if (!f) {
+            resultEl.textContent = "Chọn file ZIP.";
+            return;
+          }
+          const form = new FormData();
+          form.append("dataset_zip", f, f.name);
+          resultEl.textContent = "Đang upload…";
+          try {
+            const resp = await fetch("/api/v1/training/subtype/datasets/upload", { method: "POST", body: form });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            document.getElementById("subtypeDatasetId").value = data.dataset_id;
+            const s = data.summary || {};
+            const trainLines = Object.entries(s.train_class_counts || {})
+              .filter(([, n]) => n > 0)
+              .map(([k, n]) => `${_subtypeClassOption(k)}: ${n} ảnh train`)
+              .join("<br/>");
+            resultEl.innerHTML =
+              `✅ Mã dataset: <code>${data.dataset_id}</code><br/>` +
+              `<strong>${s.total_train_images}</strong> ảnh train · <strong>${s.total_val_images}</strong> ảnh val<br/>` +
+              (trainLines ? `${trainLines}` : "");
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          }
+        };
+
+        let subtypeActiveJobId = "";
+        let subtypeLogOffset = 0;
+        let subtypePollHandle = null;
+        const subtypeStopBtn = document.getElementById("subtypeStopBtn");
+
+        subtypeStopBtn.onclick = async () => {
+          const resultEl = document.getElementById("subtypeJobResult");
+          if (!subtypeActiveJobId) return;
+          resultEl.textContent = "Đang dừng job…";
+          try {
+            const resp = await fetch(
+              `/api/v1/training/subtype/jobs/${subtypeActiveJobId}/stop`,
+              { method: "POST" }
+            );
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            const statusEl = document.getElementById("subtypeJobStatus");
+            setStatusPill(statusEl, data.status);
+            statusEl.textContent = _subtypeStatusVi(data.status);
+            resultEl.textContent = `Đã dừng: ${data.error_text || _subtypeStatusVi(data.status)}`;
+            subtypeStopBtn.style.display = "none";
+            if (subtypePollHandle) {
+              window.clearInterval(subtypePollHandle);
+              subtypePollHandle = null;
+            }
+          } catch (err) {
+            resultEl.textContent = `Lỗi dừng job: ${err.message}`;
+          }
+        };
+
+        document.getElementById("subtypeStartBtn").onclick = async () => {
+          const resultEl = document.getElementById("subtypeJobResult");
+          const body = {
+            dataset_id: document.getElementById("subtypeDatasetId").value.trim(),
+            run_name: document.getElementById("subtypeRunName").value.trim() || "trash_subtype_classifier",
+            epochs: Number(document.getElementById("subtypeEpochs").value),
+            batch: Number(document.getElementById("subtypeBatch").value),
+            lr: Number(document.getElementById("subtypeLr").value),
+            output_path: document.getElementById("subtypeOutputPath").value.trim() || null,
+          };
+          if (!body.dataset_id) {
+            resultEl.textContent = "Cần mã dataset (gộp + tick lưu server, hoặc tải lên ở bước 2).";
+            return;
+          }
+          resultEl.textContent = "Đang tạo job huấn luyện…";
+          try {
+            const resp = await fetch("/api/v1/training/subtype/jobs", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(body),
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+            subtypeActiveJobId = data.job_id;
+            document.getElementById("subtypeCurrentJob").textContent = subtypeActiveJobId;
+            const statusEl = document.getElementById("subtypeJobStatus");
+            setStatusPill(statusEl, data.status);
+            statusEl.textContent = _subtypeStatusVi(data.status);
+            subtypeLogOffset = 0;
+            document.getElementById("subtypeLogBox").textContent = "";
+            resultEl.textContent = `Job ${subtypeActiveJobId} — ${_subtypeStatusVi(data.status)}`;
+            subtypeStopBtn.style.display = "";
+            if (subtypePollHandle) window.clearInterval(subtypePollHandle);
+            subtypePollHandle = window.setInterval(async () => {
+              if (!subtypeActiveJobId) return;
+              try {
+                const [jobResp, logResp] = await Promise.all([
+                  fetch(`/api/v1/training/subtype/jobs/${subtypeActiveJobId}`),
+                  fetch(`/api/v1/training/subtype/jobs/${subtypeActiveJobId}/logs?offset=${subtypeLogOffset}&limit=4000`),
+                ]);
+                const job = await jobResp.json();
+                const log = await logResp.json();
+                const statusEl = document.getElementById("subtypeJobStatus");
+                setStatusPill(statusEl, job.status);
+                statusEl.textContent = _subtypeStatusVi(job.status);
+                if (log.content) {
+                  document.getElementById("subtypeLogBox").textContent += log.content;
+                  document.getElementById("subtypeLogBox").scrollTop =
+                    document.getElementById("subtypeLogBox").scrollHeight;
+                }
+                subtypeLogOffset = log.next_offset || subtypeLogOffset;
+                if (job.status === "SUCCEEDED" || job.status === "FAILED") {
+                  const msg = job.status === "SUCCEEDED"
+                    ? "Huấn luyện xong."
+                    : (job.error_text || "Huấn luyện thất bại.");
+                  resultEl.textContent = `${_subtypeStatusVi(job.status)}: ${msg}`;
+                  if (job.result?.output_path) {
+                    document.getElementById("subtypeResultPath").textContent =
+                      "File weights: " + job.result.output_path;
+                  }
+                  subtypeStopBtn.style.display = "none";
+                  window.clearInterval(subtypePollHandle);
+                  subtypePollHandle = null;
+                }
+              } catch (err) {
+                resultEl.textContent = `Poll lỗi: ${err.message}`;
+              }
+            }, 2000);
+          } catch (err) {
+            resultEl.textContent = `Lỗi: ${err.message}`;
+          }
+        };
+      })();
+
+      // ===== MERGE DATASET (multi-ZIP queue) =====
+      (function () {
+        const listEl = document.getElementById("mergeZipClassList");
+        const zipInput = document.getElementById("mergeZipInput");
+        const countEl = document.getElementById("mergeZipCount");
+        /** @type {{ id: string, file: File, class: string, preview?: object }[]} */
+        let mergeZipQueue = [];
+        let mergeZipIdSeq = 0;
+
+        const _MERGE_CLASS_OPTIONS = [
+          ["TRASH", "🗑️ TRASH — Rác thải"],
+          ["WATER", "💧 WATER — Ô nhiễm nước"],
+        ];
+
+        function updateSummaryBar() {
+          const imgCounts = { TRASH: 0, WATER: 0 };
+          for (const entry of mergeZipQueue) {
+            const n = entry.preview?.image_count ?? 1;
+            imgCounts[entry.class] = (imgCounts[entry.class] || 0) + n;
+          }
+          document.getElementById("mergeSumTrashVal").textContent = imgCounts.TRASH > 0 ? imgCounts.TRASH : "—";
+          document.getElementById("mergeSumWaterVal").textContent = imgCounts.WATER > 0 ? imgCounts.WATER : "—";
+        }
+
+        async function fetchPreview(entry) {
+          const form = new FormData();
+          form.append("dataset_zip", entry.file, entry.file.name);
+          form.append("target_class", entry.class);
+          try {
+            const resp = await fetch("/api/v1/training/datasets/preview-labels", {
+              method: "POST",
+              body: form,
+            });
+            if (!resp.ok) return null;
+            return await resp.json();
+          } catch {
+            return null;
+          }
+        }
+
+        function renderMergeZipRows() {
+          countEl.textContent = `${mergeZipQueue.length} tệp ZIP`;
+          if (mergeZipQueue.length === 0) {
+            listEl.innerHTML = `<p style="margin:0;font-size:0.82rem;color:var(--muted)">Chưa có ZIP — chọn file ở ô «Thêm file ZIP» phía trên.</p>`;
+            updateSummaryBar();
+            return;
+          }
+          let html = `<table style="width:100%;font-size:0.82rem;border-collapse:collapse">`;
+          html += `<tr><th style="text-align:left;padding:0.35rem">Tệp ZIP</th><th style="text-align:left;padding:0.35rem">Class target</th><th style="text-align:left;padding:0.35rem">Preview</th><th style="width:4rem;padding:0.35rem">Xóa</th></tr>`;
+          for (const entry of mergeZipQueue) {
+            const selected = _MERGE_CLASS_OPTIONS.map(
+              ([val, label]) => `<option value="${val}"${val === entry.class ? " selected" : ""}>${label}</option>`
+            ).join("");
+            const prev = entry.preview;
+            let previewCell = `<span style="color:var(--muted)">…</span>`;
+            if (prev) {
+              const fmt = prev.label_format === "OBB" ? "OBB→AABB" : "YOLO";
+              previewCell = `<span style="font-family:var(--font-mono);font-size:0.72rem">${prev.image_count} ảnh · ${fmt}</span>`;
+            }
+            html += `<tr data-merge-id="${entry.id}">`;
+            html += `<td style="padding:0.35rem;word-break:break-all">${entry.file.name}</td>`;
+            html += `<td style="padding:0.35rem"><select class="merge-class-pick" data-id="${entry.id}" style="width:100%;padding:0.35rem">${selected}</select></td>`;
+            html += `<td style="padding:0.35rem">${previewCell}</td>`;
+            html += `<td style="padding:0.35rem;text-align:center"><button type="button" class="merge-remove-zip secondary" data-id="${entry.id}" title="Xóa ZIP này" style="font-size:0.75rem;padding:0.25rem 0.45rem">✕</button></td>`;
+            html += `</tr>`;
+          }
+          html += `</table>`;
+          listEl.innerHTML = html;
+
+          listEl.querySelectorAll(".merge-class-pick").forEach((sel) => {
+            sel.addEventListener("change", async () => {
+              const id = sel.getAttribute("data-id");
+              const item = mergeZipQueue.find((e) => e.id === id);
+              if (!item) return;
+              item.class = sel.value;
+              item.preview = await fetchPreview(item);
+              renderMergeZipRows();
+            });
+          });
+          listEl.querySelectorAll(".merge-remove-zip").forEach((btn) => {
+            btn.addEventListener("click", () => {
+              const id = btn.getAttribute("data-id");
+              mergeZipQueue = mergeZipQueue.filter((e) => e.id !== id);
+              renderMergeZipRows();
+            });
+          });
+          updateSummaryBar();
+        }
+
+        zipInput.addEventListener("change", async () => {
+          const picked = zipInput.files;
+          if (!picked || picked.length === 0) return;
+          const newEntries = [];
+          for (let i = 0; i < picked.length; i++) {
+            newEntries.push({
+              id: `mz_${++mergeZipIdSeq}`,
+              file: picked[i],
+              class: "WATER",
+              preview: null,
+            });
+          }
+          zipInput.value = "";
+          mergeZipQueue = mergeZipQueue.concat(newEntries);
+          renderMergeZipRows();
+          for (const entry of newEntries) {
+            entry.preview = await fetchPreview(entry);
+          }
+          renderMergeZipRows();
+        });
+
+        document.getElementById("mergeClearAllZips").onclick = () => {
+          mergeZipQueue = [];
+          zipInput.value = "";
+          renderMergeZipRows();
+        };
+
+        renderMergeZipRows();
+
+        document.getElementById("mergeRunBtn").addEventListener("click", async () => {
+          const resultBox = document.getElementById("mergeResultBox");
+          resultBox.style.display = "";
+          resultBox.style.background = "rgba(248,250,252,0.95)";
+          resultBox.style.color = "var(--text)";
+
+          if (mergeZipQueue.length === 0) {
+            resultBox.style.background = "#fef2f2";
+            resultBox.style.color = "#b91c1c";
+            resultBox.textContent = "Chọn ít nhất 1 file ZIP.";
+            return;
+          }
+
+          listEl.querySelectorAll(".merge-class-pick").forEach((sel) => {
+            const id = sel.getAttribute("data-id");
+            const item = mergeZipQueue.find((e) => e.id === id);
+            if (item) item.class = sel.value;
+          });
+
+          resultBox.textContent = "Đang gộp dataset…";
+
+          const form = new FormData();
+          const classes = mergeZipQueue.map((e) => e.class);
+          for (const entry of mergeZipQueue) {
+            form.append("zips", entry.file, entry.file.name);
+          }
+          form.append("classes_json", JSON.stringify(classes));
+
+          try {
+            const resp = await fetch("/api/v1/training/datasets/merge-zips", {
+              method: "POST",
+              body: form,
+            });
+
+            if (!resp.ok) {
+              const err = await resp.json().catch(() => ({}));
+              throw new Error(err.detail || `Server error ${resp.status}`);
+            }
+
+            const statsRaw = resp.headers.get("X-Stats");
+            const stats = statsRaw ? JSON.parse(statsRaw) : {};
+            const blob = await resp.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = "merged_dataset.zip";
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            const cc = stats.class_counts ?? {};
+            const slotLines = (stats.slots || [])
+              .map((s) => `${s.target_class}: ${s.images} ảnh`)
+              .join(" · ");
+
+            resultBox.style.background = "#ecfdf5";
+            resultBox.style.color = "#047857";
+            resultBox.innerHTML =
+              `<strong>✅ Download xong: merged_dataset.zip</strong><br/>` +
+              `<span style="font-family:var(--font-mono);font-size:0.78rem">` +
+              `${mergeZipQueue.length} ZIP gộp · Tổng: ${stats.total_images} ảnh · train=${stats.train_images} / val=${stats.val_images} / test=${stats.test_images} (70/15/15)<br/>` +
+              `${slotLines}<br/>` +
+              `TRASH bbox: ${cc["0"] ?? 0} · WATER bbox: ${cc["1"] ?? 0}` +
+              `</span><br/><br/>` +
+              `<span style="font-size:0.8rem;color:#047857">👉 Vào tab <strong>🎯 YOLO — Pollution</strong> → Upload ZIP → Start training</span>`;
+          } catch (err) {
+            resultBox.style.background = "#fef2f2";
+            resultBox.style.color = "#b91c1c";
+            resultBox.textContent = `Lỗi: ${err.message}`;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

@@ -3,64 +3,821 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>GreenLens — Demo chụp ảnh &amp; xác nhận loại ô nhiễm</title>
+  <title>GreenLens — Demo phân loại</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet" />
   <style>
-    :root { font-family: system-ui, sans-serif; line-height: 1.4; }
-    body { max-width: 36rem; margin: 1rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.2rem; }
-    fieldset { border: 1px solid #ccc; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
-    button, select, input[type="file"] { font: inherit; margin: 0.25rem 0.5rem 0.25rem 0; }
-    #preview { max-width: 100%; border-radius: 8px; margin-top: 0.5rem; }
-    #result { white-space: pre-wrap; background: #f6f6f6; padding: 0.75rem; border-radius: 8px; font-size: 0.9rem; }
-    .row { margin: 0.5rem 0; }
-    .muted { color: #555; font-size: 0.85rem; }
-    .pill { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 999px; background: #e8f4ea; }
+    :root {
+      --surface: rgba(255, 255, 255, 0.72);
+      --surface-strong: rgba(255, 255, 255, 0.9);
+      --stroke: rgba(255, 255, 255, 0.55);
+      --line: rgba(15, 23, 42, 0.08);
+      --text: #0f172a;
+      --muted: #64748b;
+      --brand: #059669;
+      --brand-deep: #047857;
+      --brand-glow: rgba(16, 185, 129, 0.45);
+      --sky: #0ea5e9;
+      --accent-glow: rgba(14, 165, 233, 0.2);
+      --terminal: #0c1222;
+      --terminal-border: rgba(52, 211, 153, 0.12);
+      --terminal-fg: #a7f3d0;
+      --radius-lg: 20px;
+      --radius-md: 14px;
+      --radius-sm: 10px;
+      --shadow-soft: 0 8px 32px rgba(15, 23, 42, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
+      --shadow-lift: 0 24px 48px -12px rgba(15, 23, 42, 0.12), 0 12px 24px -8px rgba(15, 23, 42, 0.08);
+      --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif;
+      --font-mono: "JetBrains Mono", Consolas, monospace;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+    }
+
+    * { box-sizing: border-box; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font-sans);
+      color: var(--text);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      background-color: #e8eef5;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before,
+    body::after {
+      content: "";
+      position: fixed;
+      inset: auto;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.55;
+      z-index: 0;
+      pointer-events: none;
+    }
+    body::before {
+      width: min(72vw, 640px);
+      height: min(72vw, 640px);
+      top: -18%;
+      right: -12%;
+      background: radial-gradient(circle, rgba(16, 185, 129, 0.55) 0%, rgba(14, 165, 233, 0.15) 55%, transparent 70%);
+      animation: float-a 18s ease-in-out infinite;
+    }
+    body::after {
+      width: min(90vw, 720px);
+      height: min(90vw, 720px);
+      bottom: -25%;
+      left: -20%;
+      background: radial-gradient(circle, rgba(14, 165, 233, 0.35) 0%, rgba(5, 150, 105, 0.12) 50%, transparent 72%);
+      animation: float-b 22s ease-in-out infinite;
+    }
+    @keyframes float-a {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(-4%, 3%) scale(1.05); }
+    }
+    @keyframes float-b {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50% { transform: translate(5%, -4%) scale(1.08); }
+    }
+
+    ::selection {
+      background: rgba(16, 185, 129, 0.22);
+      color: var(--text);
+    }
+
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 920px;
+      margin: 0 auto;
+      padding: clamp(1.25rem, 4vw, 2.25rem) clamp(1rem, 3vw, 1.5rem) 3rem;
+    }
+
+    .hero {
+      margin-bottom: 1.75rem;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.28rem 0.75rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--brand-deep);
+      background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(236, 253, 245, 0.9));
+      border: 1px solid rgba(16, 185, 129, 0.25);
+      box-shadow: 0 2px 12px rgba(5, 150, 105, 0.12);
+      margin-bottom: 0.85rem;
+    }
+    .hero-badge span.dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--brand);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+    }
+
+    .brand-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: 1rem 1.15rem;
+    }
+    .logo-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .logo-mark {
+      width: 3.25rem;
+      height: 3.25rem;
+      border-radius: 18px;
+      background: linear-gradient(145deg, #10b981 0%, #059669 45%, #047857 100%);
+      box-shadow:
+        0 12px 28px var(--brand-glow),
+        inset 0 1px 0 rgba(255,255,255,0.35);
+      display: grid;
+      place-items: center;
+    }
+    .logo-mark svg {
+      width: 1.45rem;
+      height: 1.45rem;
+      color: #fff;
+      opacity: 0.95;
+    }
+    .logo-glow {
+      position: absolute;
+      inset: -8px;
+      border-radius: 22px;
+      background: linear-gradient(135deg, rgba(16,185,129,0.35), transparent 60%);
+      z-index: -1;
+      filter: blur(12px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.35rem, 4vw, 1.75rem);
+      font-weight: 800;
+      letter-spacing: -0.035em;
+      line-height: 1.2;
+      background: linear-gradient(120deg, #0f172a 0%, #1e293b 40%, #047857 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+    .subtitle {
+      margin: 0.5rem 0 0;
+      font-size: 0.94rem;
+      color: var(--muted);
+      max-width: 38rem;
+    }
+    .subtitle code {
+      font-family: var(--font-mono);
+      font-size: 0.8em;
+    }
+
+    .tab-bar {
+      display: inline-flex;
+      padding: 4px;
+      margin-top: 1.35rem;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.55);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    .tab-bar a {
+      padding: 0.45rem 1.05rem;
+      border-radius: 999px;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      text-decoration: none;
+      color: var(--muted);
+      transition: color 0.2s, background 0.2s, box-shadow 0.2s;
+    }
+    .tab-bar a:hover:not(.active) {
+      color: var(--brand-deep);
+      background: rgba(255,255,255,0.65);
+    }
+    .tab-bar a.active {
+      color: #fff;
+      background: linear-gradient(180deg, #10b981, #059669);
+      box-shadow: 0 6px 20px rgba(5, 150, 105, 0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .tab-bar a:focus-visible {
+      outline: 2px solid var(--sky);
+      outline-offset: 2px;
+    }
+
+    .info-callout {
+      display: flex;
+      gap: 0.9rem;
+      align-items: flex-start;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.65;
+      padding: 1rem 1.15rem 1rem 0;
+      border-radius: var(--radius-md);
+      background: linear-gradient(135deg, rgba(255,255,255,0.9), rgba(248,250,252,0.82));
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--brand);
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 1.35rem;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .info-callout .callout-icon {
+      flex-shrink: 0;
+      width: 2.25rem;
+      height: 2.25rem;
+      margin-left: 1rem;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      display: grid;
+      place-items: center;
+      color: var(--brand-deep);
+    }
+    .info-callout .callout-icon svg { width: 1.15rem; height: 1.15rem; }
+    .info-callout strong { color: var(--text); font-weight: 700; }
+    .info-callout .callout-body { padding-right: 0.65rem; }
+
+    .class-legend {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.4rem;
+      margin: 0 0 1rem;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+    .class-legend span { opacity: 0.85; margin-right: 0.15rem; }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.22rem 0.52rem;
+      border-radius: 999px;
+      font-size: 0.6875rem;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+      border: 1px solid transparent;
+    }
+    .chip.t0 { background: #fef3c7; color: #92400e; border-color: rgba(245,158,11,0.3); }
+    .chip.t1 { background: #e0f2fe; color: #0369a1; border-color: rgba(14,165,233,0.25); }
+    .chip.t2 { background: #f1f5f9; color: #475569; border-color: rgba(100,116,139,0.25); }
+    .chip.t3 { background: #ede9fe; color: #5b21b6; border-color: rgba(139,92,246,0.25); }
+
+    .steps-lower {
+      display: grid;
+      gap: 1.1rem;
+    }
+    @media (min-width: 860px) {
+      .steps-lower {
+        grid-template-columns: 1fr 1fr;
+        align-items: start;
+      }
+    }
+
+    .card {
+      position: relative;
+      padding: 1.2rem 1.35rem 1.35rem;
+      margin-bottom: 1.1rem;
+      border-radius: var(--radius-lg);
+      background: linear-gradient(145deg, var(--surface) 0%, var(--surface-strong) 100%);
+      border: 1px solid var(--stroke);
+      box-shadow: var(--shadow-soft);
+      backdrop-filter: blur(20px) saturate(1.35);
+      -webkit-backdrop-filter: blur(20px) saturate(1.35);
+      transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s ease;
+    }
+    .card:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lift);
+    }
+    .card-top-shine {
+      position: absolute;
+      top: 0;
+      left: 12%;
+      right: 12%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.9), transparent);
+      border-radius: 1px;
+      opacity: 0.85;
+      pointer-events: none;
+    }
+
+    .card h2 {
+      margin: 0 0 0.95rem;
+      font-size: 0.9375rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+    .step-num {
+      display: grid;
+      place-items: center;
+      width: 1.85rem;
+      height: 1.85rem;
+      border-radius: 11px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      color: var(--brand-deep);
+      background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+      border: 1px solid rgba(16, 185, 129, 0.22);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+    }
+
+    .step1-grid {
+      display: grid;
+      gap: 1rem;
+    }
+    @media (min-width: 720px) {
+      .step1-grid {
+        grid-template-columns: 1fr 1fr;
+        align-items: stretch;
+      }
+    }
+
+    .file-zone {
+      position: relative;
+      min-height: 200px;
+      border-radius: var(--radius-md);
+      border: 2px dashed rgba(100, 116, 139, 0.32);
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 0%, rgba(16,185,129,0.08), transparent 55%),
+        linear-gradient(180deg, rgba(248,250,252,0.95), rgba(255,255,255,0.65));
+      transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s ease;
+      overflow: hidden;
+    }
+    .file-zone:hover,
+    .file-zone:focus-within {
+      border-color: rgba(5, 150, 105, 0.55);
+      box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12), 0 12px 32px rgba(15,23,42,0.06);
+    }
+    .file-zone.is-drag {
+      border-color: var(--brand);
+      border-style: solid;
+      transform: scale(1.01);
+      box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.2), 0 16px 40px rgba(5,150,105,0.15);
+      background:
+        radial-gradient(ellipse 100% 80% at 50% 40%, rgba(16,185,129,0.14), transparent 60%),
+        linear-gradient(180deg, #ecfdf5, #fff);
+    }
+    .file-zone input[type="file"] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+      z-index: 3;
+      font-size: 0;
+    }
+
+    .file-zone-ui {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 1.25rem 1rem;
+      gap: 0.45rem;
+    }
+    .file-zone-ui .fz-icon {
+      width: 3rem;
+      height: 3rem;
+      border-radius: 14px;
+      background: linear-gradient(145deg, #fff, #f1f5f9);
+      border: 1px solid var(--line);
+      display: grid;
+      place-items: center;
+      color: var(--brand);
+      margin-bottom: 0.25rem;
+      box-shadow: 0 6px 20px rgba(15,23,42,0.06);
+    }
+    .file-zone-ui .fz-icon svg { width: 1.35rem; height: 1.35rem; }
+    .file-zone-ui strong {
+      font-size: 0.9375rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      color: var(--text);
+    }
+    .file-zone-ui span.fz-hint {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      font-weight: 600;
+      max-width: 16rem;
+      line-height: 1.45;
+    }
+    .file-zone-ui .fz-formats {
+      margin-top: 0.35rem;
+      font-size: 0.6875rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #94a3b8;
+    }
+
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 200px;
+    }
+    .preview-label {
+      font-size: 0.6875rem;
+      font-weight: 800;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .preview-frame {
+      position: relative;
+      flex: 1;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(145deg, rgba(248,250,252,0.98), rgba(241,245,249,0.65));
+      overflow: hidden;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+    }
+    .preview-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 1.25rem;
+      color: #94a3b8;
+      font-size: 0.8125rem;
+      font-weight: 650;
+      text-align: center;
+    }
+    .preview-placeholder svg {
+      width: 2.25rem;
+      height: 2.25rem;
+      opacity: 0.45;
+    }
+    .preview-frame.has-image .preview-placeholder {
+      display: none;
+    }
+    #preview {
+      display: none;
+      max-height: 340px;
+      max-width: 100%;
+      object-fit: contain;
+      vertical-align: middle;
+    }
+    .preview-frame.has-image #preview {
+      display: block;
+    }
+    #detectionCanvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
+
+    .card-head-sub {
+      margin: -0.35rem 0 0.9rem 2.5rem;
+      font-size: 0.8125rem;
+      color: var(--muted);
+      font-weight: 600;
+      line-height: 1.45;
+    }
+
+    .row-actions {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem;
+      margin-top: 0.25rem;
+    }
+
+    button {
+      position: relative;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 0.875rem;
+      padding: 0.62rem 1.2rem;
+      cursor: pointer;
+      overflow: hidden;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s;
+    }
+    button:focus-visible {
+      outline: 2px solid var(--sky);
+      outline-offset: 3px;
+    }
+    button:active:not(:disabled) { transform: scale(0.97); }
+    button.primary {
+      color: #fff;
+      background: linear-gradient(180deg, #10b981 0%, #059669 55%, #047857 100%);
+      box-shadow:
+        0 8px 24px rgba(5, 150, 105, 0.38),
+        inset 0 1px 0 rgba(255,255,255,0.25);
+    }
+    button.primary::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%);
+      transform: translateX(-100%);
+      transition: transform 0.55s ease;
+    }
+    button.primary:hover:not(:disabled)::after { transform: translateX(100%); }
+    button.primary:hover:not(:disabled) {
+      filter: brightness(1.04);
+      box-shadow: 0 10px 32px rgba(5, 150, 105, 0.45);
+    }
+    button.secondary {
+      color: var(--brand-deep);
+      background: rgba(255,255,255,0.85);
+      border: 1.5px solid rgba(16, 185, 129, 0.35);
+      box-shadow: 0 2px 10px rgba(5, 150, 105, 0.08);
+    }
+    button.secondary:hover:not(:disabled) {
+      background: #ecfdf5;
+      border-color: rgba(5, 150, 105, 0.5);
+    }
+    button:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    #busy.pill-busy {
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #0369a1;
+      background: linear-gradient(135deg, #e0f2fe, #f0f9ff);
+      padding: 0.35rem 0.75rem;
+      border-radius: 999px;
+      border: 1px solid rgba(14, 165, 233, 0.22);
+      animation: pulse-soft 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-soft {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.72; }
+    }
+
+    .terminal {
+      position: relative;
+      margin-top: 1rem;
+      border-radius: var(--radius-md);
+      background: var(--terminal);
+      border: 1px solid var(--terminal-border);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06), 0 16px 40px rgba(0,0,0,0.2);
+      min-height: 7.5rem;
+      max-height: min(420px, 52vh);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 0.75rem;
+      background: rgba(15, 23, 42, 0.65);
+      border-bottom: 1px solid rgba(52, 211, 153, 0.1);
+    }
+    .terminal-bar span {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+    .terminal-bar span:nth-child(1) { background: #f87171; }
+    .terminal-bar span:nth-child(2) { background: #fbbf24; }
+    .terminal-bar span:nth-child(3) { background: #34d399; margin-right: auto; }
+    .terminal-bar .title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: rgba(167, 243, 208, 0.65);
+      text-transform: uppercase;
+    }
+    #result {
+      margin: 0;
+      padding: 0.9rem 1rem 1.1rem;
+      white-space: pre-wrap;
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      line-height: 1.62;
+      color: var(--terminal-fg);
+      overflow-y: auto;
+      flex: 1;
+      min-height: 0;
+    }
+    #result::-webkit-scrollbar { width: 8px; }
+    #result::-webkit-scrollbar-thumb {
+      background: rgba(52, 211, 153, 0.25);
+      border-radius: 999px;
+    }
+
+    label.field-label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+      letter-spacing: -0.01em;
+    }
+    select#pickType {
+      width: 100%;
+      padding: 0.6rem 0.85rem;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      font: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      background: #fff;
+      color: var(--text);
+      margin-bottom: 0.85rem;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(15,23,42,0.06);
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    select#pickType:focus {
+      outline: none;
+      border-color: rgba(5, 150, 105, 0.45);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+    }
+
+    #confirmNote {
+      margin-top: 0.85rem;
+      padding: 0.65rem 0.85rem;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, #fffbeb, #fef3c7);
+      color: #b45309;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-size: 0.78em;
+      font-weight: 500;
+      background: rgba(14, 165, 233, 0.12);
+      color: #0c4a6e;
+      padding: 0.12rem 0.4rem;
+      border-radius: 6px;
+    }
+
+    footer.site-foot {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
-  <h1>Demo: chụp / chọn ảnh → AI gợi ý loại → bạn xác nhận</h1>
-  <p class="muted">Mở qua API: <code>http://127.0.0.1:8000/demo/demo_capture_classify.html</code></p>
-  <p class="muted">
-    Nếu bạn thấy <strong>KEEP_USER_CHOICE</strong>, <strong>predictions []</strong>, <strong>confidence 0</strong>:
-    thường là chưa có file weights tại <code>MODEL_PATH</code>, hoặc model không phải bản huấn luyện ô nhiễm (COCO không map TRASH/WATER/…).
-    Để demo không cần weights: trong <code>.env</code> đặt <code>CLASSIFY_DEMO_MODE=true</code> rồi khởi động lại server — trả ví dụ <code>SUGGEST</code>;
-    <code>model_version</code> sẽ có hậu tố <code>+demo-no-weights</code>.
-  </p>
+  <div class="wrap">
+    <header class="hero">
+      <div class="hero-badge"><span class="dot" aria-hidden="true"></span> GreenLens · Demo</div>
+      <div class="brand-row">
+        <div class="logo-wrap">
+          <div class="logo-glow" aria-hidden="true"></div>
+          <div class="logo-mark" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <path d="M12 3L4 9v6l8 6 8-6V9l-8-6z" stroke="currentColor" stroke-width="1.85" stroke-linejoin="round"/>
+              <path d="M12 12l4-3v6l-4 3-4-3V9l4 3z" fill="currentColor" opacity="0.35"/>
+            </svg>
+          </div>
+        </div>
+        <div>
+          <h1>Chụp hoặc chọn ảnh — AI gợi ý — bạn xác nhận loại ô nhiễm</h1>
+          <p class="subtitle">Chạy tại <code>http://127.0.0.1:8000/demo/demo_capture_classify.html</code> khi server đã bật.</p>
+        </div>
+      </div>
+      <nav class="tab-bar" aria-label="Điều hướng demo">
+        <a href="/demo/demo_capture_classify.html" class="active">Phân loại</a>
+        <a href="/demo/demo_training_dashboard.html">Huấn luyện</a>
+      </nav>
+    </header>
 
-  <fieldset>
-    <legend>1. Ảnh</legend>
-    <div class="row">
-      <input id="fileInput" type="file" accept="image/*" capture="environment" />
+    <div class="info-callout">
+      <div class="callout-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+      </div>
+      <div class="callout-body">
+        Nếu bạn thấy <strong>KEEP_USER_CHOICE</strong>, <strong>predictions []</strong>, <strong>confidence 0</strong>:
+        thường là chưa có weights tại <code>MODEL_PATH</code>, hoặc model không đúng bài toán ô nhiễm.
+        Để thử không cần file <code>.pt</code>: trong <code>.env</code> đặt <code>CLASSIFY_DEMO_MODE=true</code>, khởi động lại server.
+      </div>
     </div>
-    <img id="preview" alt="Xem trước" hidden />
-  </fieldset>
 
-  <fieldset>
-    <legend>2. Gọi AI</legend>
-    <button type="button" id="analyzeBtn" disabled>Phân loại</button>
-    <span id="busy" class="muted" hidden>Đang xử lý…</span>
-    <div id="result">Chưa có kết quả.</div>
-  </fieldset>
+    <p class="class-legend" aria-hidden="true">
+      <span>Nhãn YOLO</span>
+      <span class="chip t0">0 TRASH</span>
+      <span class="chip t1">1 WATER</span>
+      <span class="chip t2">2 SMOKE</span>
+      <span class="chip t3">3 CHEMICAL</span>
+    </p>
 
-  <fieldset>
-    <legend>3. Xác nhận loại (người dùng)</legend>
-    <label for="pickType">Loại bạn xác nhận:</label>
-    <select id="pickType">
-      <option value="">— Chọn —</option>
-      <option value="TRASH">TRASH — Rác thải</option>
-      <option value="WATER">WATER — Nước thải</option>
-      <option value="SMOKE">SMOKE — Khói / khí</option>
-      <option value="CHEMICAL">CHEMICAL — Hóa chất</option>
-      <option value="NOISE" disabled title="AI không infer tiếng ồn (Option A)">NOISE — Tiếng ồn</option>
-    </select>
-    <button type="button" id="confirmBtn" disabled>Ghi nhận lựa chọn</button>
-    <div id="confirmNote" class="muted row"></div>
-  </fieldset>
+    <section class="card">
+      <div class="card-top-shine" aria-hidden="true"></div>
+      <h2><span class="step-num">1</span> Ảnh đầu vào</h2>
+      <p class="card-head-sub">Kéo thả ảnh hoặc chụp trực tiếp — ảnh chỉ xử lý trên trình duyệt của bạn khi gọi API.</p>
+      <div class="step1-grid">
+        <div class="file-zone" id="fileZone" aria-label="Kéo thả hoặc chọn ảnh">
+          <input id="fileInput" type="file" accept="image/*,.heic,.heif" capture="environment" />
+          <div class="file-zone-ui" aria-hidden="true">
+            <div class="fz-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <strong>Thả ảnh vào đây</strong>
+            <span class="fz-hint">hoặc nhấn để chọn từ máy / máy ảnh điện thoại</span>
+            <span class="fz-formats">JPG · PNG · WebP · HEIC (tự chuyển JPG để xem trước)</span>
+          </div>
+        </div>
+        <div class="preview-panel">
+          <div class="preview-label">Xem trước</div>
+          <div class="preview-frame" id="previewFrame">
+            <div class="preview-placeholder" id="previewPlaceholder">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+              Chưa có ảnh
+            </div>
+            <img id="preview" alt="Ảnh xem trước" />
+            <canvas id="detectionCanvas"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="steps-lower">
+    <section class="card">
+      <div class="card-top-shine" aria-hidden="true"></div>
+      <h2><span class="step-num">2</span> Gọi AI</h2>
+      <p class="card-head-sub">POST <code>/api/v1/classify-upload</code> — kết quả raw hiển thị bên dưới.</p>
+      <div class="row-actions">
+        <button type="button" class="primary" id="analyzeBtn" disabled>Chạy phân loại</button>
+        <span id="busy" class="pill-busy" hidden>Đang xử lý…</span>
+      </div>
+      <div class="terminal" role="region" aria-label="Kết quả API">
+        <div class="terminal-bar"><span></span><span></span><span></span><span class="title">classify-upload</span></div>
+        <div id="result">Chưa có kết quả.</div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-top-shine" aria-hidden="true"></div>
+      <h2><span class="step-num">3</span> Xác nhận loại</h2>
+      <p class="card-head-sub">Bước demo: ghi nhận phía client (chưa gửi lên backend).</p>
+      <label class="field-label" for="pickType">Loại bạn xác nhận</label>
+      <select id="pickType">
+        <option value="">— Chọn —</option>
+        <option value="TRASH">TRASH — Rác thải</option>
+        <option value="WATER">WATER — Nước thải</option>
+        <option value="SMOKE">SMOKE — Khói / khí</option>
+        <option value="CHEMICAL">CHEMICAL — Hóa chất</option>
+        <option value="NOISE" disabled title="AI không infer tiếng ồn (Option A)">NOISE — Tiếng ồn</option>
+      </select>
+      <button type="button" class="secondary" id="confirmBtn" disabled>Ghi nhận lựa chọn</button>
+      <div id="confirmNote" style="display: none;"></div>
+    </section>
+    </div>
+
+    <footer class="site-foot">GreenLens Detection AI · chỉ là giao diện demo cục bộ</footer>
+  </div>
 
   <script>
     (function () {
       var fileInput = document.getElementById("fileInput");
+      var fileZone = document.getElementById("fileZone");
       var preview = document.getElementById("preview");
+      var previewFrame = document.getElementById("previewFrame");
+      var previewPlaceholder = document.getElementById("previewPlaceholder");
+      var canvas = document.getElementById("detectionCanvas");
+      var ctx = canvas.getContext("2d");
       var analyzeBtn = document.getElementById("analyzeBtn");
       var busy = document.getElementById("busy");
       var resultEl = document.getElementById("result");
@@ -70,40 +827,357 @@
 
       var lastPayload = null;
       var noiseSupported = false;
+      var lastPreviewUrl = null;
+      var pendingUploadFile = null;
+      var dragDepth = 0;
+
+      function parseApiError(res) {
+        return res.text().then(function (text) {
+          try {
+            var j = JSON.parse(text);
+            var d = j && j.detail;
+            if (typeof d === "string") return d;
+            if (Array.isArray(d) && d.length) return d.map(function (x) { return x.msg || x; }).join("; ");
+            if (d) return JSON.stringify(d);
+          } catch (e) { /* not JSON */ }
+          return (text && text.trim()) || res.statusText || "Lỗi " + res.status;
+        });
+      }
+
+      function isHeicFile(file) {
+        if (!file) return false;
+        var name = (file.name || "").toLowerCase();
+        var t = (file.type || "").toLowerCase();
+        return (
+          name.endsWith(".heic") ||
+          name.endsWith(".heif") ||
+          t === "image/heic" ||
+          t === "image/heif" ||
+          t === "image/heif-sequence"
+        );
+      }
+
+      function prepareImageFile(rawFile) {
+        if (!isHeicFile(rawFile)) {
+          return Promise.resolve(rawFile);
+        }
+        var fd = new FormData();
+        fd.append("image", rawFile, rawFile.name || "photo.heic");
+        return fetch("/api/v1/images/normalize", { method: "POST", body: fd })
+          .then(function (res) {
+            if (!res.ok) {
+              return parseApiError(res).then(function (msg) {
+                throw new Error(msg || "Chuyển HEIC thất bại.");
+              });
+            }
+            return res.blob();
+          })
+          .then(function (blob) {
+            var base = (rawFile.name || "photo").replace(/\.(heic|heif)$/i, "");
+            return new File([blob], base + ".jpg", {
+              type: "image/jpeg",
+              lastModified: rawFile.lastModified,
+            });
+          });
+      }
+
+      function showPreviewPlaceholder(msg) {
+        if (!previewPlaceholder) return;
+        previewPlaceholder.style.display = "";
+        while (previewPlaceholder.firstChild) previewPlaceholder.removeChild(previewPlaceholder.firstChild);
+        previewPlaceholder.appendChild(document.createTextNode(msg));
+      }
+
+      // Màu cho từng loại ô nhiễm (border, fill với alpha)
+      var CLASS_COLORS = {
+        TRASH:    { stroke: "#f59e0b", fill: "rgba(245,158,11,0.12)",    label: "#92400e" },
+        WATER:    { stroke: "#0ea5e9", fill: "rgba(14,165,233,0.12)",    label: "#0369a1" },
+        SMOKE:    { stroke: "#94a3b8", fill: "rgba(148,163,184,0.12)",   label: "#475569" },
+        CHEMICAL: { stroke: "#8b5cf6", fill: "rgba(139,92,246,0.12)",    label: "#5b21b6" },
+      };
+      var DEFAULT_COLOR = { stroke: "#10b981", fill: "rgba(16,185,129,0.12)", label: "#047857" };
+
+      var SUBTYPE_VI = {
+        HOUSEHOLD: "Sinh hoạt",
+        RECYCLABLE: "Tái chế",
+        ORGANIC: "Hữu cơ",
+        MEDICAL: "Y tế",
+        ELECTRONIC: "Điện tử",
+        CONSTRUCTION: "Xây dựng",
+        HAZARDOUS: "Nguy hại",
+        UNKNOWN: "Chưa rõ",
+      };
+
+      var SUBTYPE_TAG_COLORS = {
+        HOUSEHOLD: "#b45309",
+        RECYCLABLE: "#047857",
+        ORGANIC: "#15803d",
+        MEDICAL: "#be123c",
+        ELECTRONIC: "#6d28d9",
+        CONSTRUCTION: "#57534e",
+        HAZARDOUS: "#c2410c",
+        UNKNOWN: "#64748b",
+      };
+
+      var lastDrawPredictions = null;
+
+      function getColor(cls) {
+        return CLASS_COLORS[cls] || DEFAULT_COLOR;
+      }
+
+      function formatSubtypeLine(subtype, subtypeConf) {
+        if (!subtype || subtype === "UNKNOWN") return null;
+        var vi = SUBTYPE_VI[subtype] || subtype;
+        if (subtypeConf != null && !isNaN(subtypeConf)) {
+          return vi + " " + Math.round(Number(subtypeConf) * 100) + "%";
+        }
+        return vi;
+      }
+
+      function drawTag(ctx, x, y, lines, bgColor, fontSize) {
+        var padX = 6;
+        var padY = 4;
+        var lineH = fontSize + 4;
+        var maxW = 0;
+        lines.forEach(function (line) {
+          var w = ctx.measureText(line).width;
+          if (w > maxW) maxW = w;
+        });
+        var tagW = maxW + padX * 2;
+        var tagH = lines.length * lineH + padY * 2;
+        var r = 4;
+        ctx.fillStyle = bgColor;
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + tagW - r, y);
+        ctx.quadraticCurveTo(x + tagW, y, x + tagW, y + r);
+        ctx.lineTo(x + tagW, y + tagH - r);
+        ctx.quadraticCurveTo(x + tagW, y + tagH, x + tagW - r, y + tagH);
+        ctx.lineTo(x + r, y + tagH);
+        ctx.quadraticCurveTo(x, y + tagH, x, y + tagH - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = "#fff";
+        lines.forEach(function (line, i) {
+          ctx.fillText(line, x + padX, y + padY + fontSize + i * lineH);
+        });
+        return { w: tagW, h: tagH };
+      }
 
       function setText(el, text) {
         while (el.firstChild) el.removeChild(el.firstChild);
         el.appendChild(document.createTextNode(text));
       }
 
+      function showConfirmNote(text) {
+        setText(confirmNote, text);
+        confirmNote.style.display = text ? "block" : "none";
+      }
+
+      function clearCanvas() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+
+      function drawBoxes(predictions) {
+        lastDrawPredictions = predictions;
+        // Lấy kích thước img đang render trong DOM
+        var dispW = preview.offsetWidth;
+        var dispH = preview.offsetHeight;
+        if (!dispW || !dispH) return;
+
+        // naturalWidth/naturalHeight là kích thước ảnh gốc mà server nhận
+        var natW = preview.naturalWidth || dispW;
+        var natH = preview.naturalHeight || dispH;
+
+        // Tính offset do object-fit: contain tạo ra letterbox
+        var scaleX = dispW / natW;
+        var scaleY = dispH / natH;
+        var scale = Math.min(scaleX, scaleY);
+        var renderW = natW * scale;
+        var renderH = natH * scale;
+        var offX = (dispW - renderW) / 2;
+        var offY = (dispH - renderH) / 2;
+
+        // Căn canvas với img element
+        var imgRect = preview.getBoundingClientRect();
+        var frameRect = previewFrame.getBoundingClientRect();
+        canvas.width = dispW;
+        canvas.height = dispH;
+        canvas.style.width = dispW + "px";
+        canvas.style.height = dispH + "px";
+        canvas.style.top = (imgRect.top - frameRect.top) + "px";
+        canvas.style.left = (imgRect.left - frameRect.left) + "px";
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        var FONT_SIZE = Math.max(11, Math.round(renderH * 0.038));
+        ctx.font = "700 " + FONT_SIZE + "px 'JetBrains Mono', monospace";
+
+        predictions.forEach(function (pred) {
+          var boxes = pred.boxes || [];
+          if (!boxes.length) return;
+          var cls = pred["class"] || pred.pollutant_kind || "?";
+          var color = getColor(cls);
+
+          boxes.forEach(function (b) {
+            var bx1 = offX + b.x1 * scale;
+            var by1 = offY + b.y1 * scale;
+            var bx2 = offX + b.x2 * scale;
+            var by2 = offY + b.y2 * scale;
+            var bw = bx2 - bx1;
+            var bh = by2 - by1;
+
+            // Fill
+            ctx.fillStyle = color.fill;
+            ctx.fillRect(bx1, by1, bw, bh);
+
+            // Border
+            ctx.strokeStyle = color.stroke;
+            ctx.lineWidth = 2.5;
+            ctx.strokeRect(bx1, by1, bw, bh);
+
+            // Label: dòng 1 = TRASH 44%, dòng 2 = loại rác chi tiết (nếu có)
+            var pct = Math.round((b.confidence || pred.confidence) * 100);
+            var subLine = formatSubtypeLine(b.subtype, b.subtype_confidence);
+            var tagX = bx1;
+            var lineH = FONT_SIZE + 4;
+            var blockH = lineH + 8 + (subLine ? lineH + 8 : 0);
+            var tagY = by1 - blockH;
+            if (tagY < 0) tagY = by1;
+
+            var mainTag = drawTag(ctx, tagX, tagY, [cls + " " + pct + "%"], color.stroke, FONT_SIZE);
+            if (subLine) {
+              var subColor = SUBTYPE_TAG_COLORS[b.subtype] || "#475569";
+              drawTag(ctx, tagX, tagY + mainTag.h, [subLine], subColor, Math.max(10, FONT_SIZE - 1));
+            }
+          });
+
+          // Tóm tắt subtypes cấp ảnh (khi API trả subtypes[])
+          var summary = pred.subtypes;
+          if (cls === "TRASH" && summary && summary.length) {
+            var sumLines = ["Loại rác trong ảnh:"];
+            summary.forEach(function (s) {
+              var vi = SUBTYPE_VI[s.subtype] || s.subtype;
+              sumLines.push(
+                vi + " ×" + s.count + (s.confidence != null ? " (" + Math.round(s.confidence * 100) + "%)" : "")
+              );
+            });
+            var sumFont = Math.max(10, FONT_SIZE - 1);
+            ctx.font = "600 " + sumFont + "px 'JetBrains Mono', monospace";
+            drawTag(ctx, offX + 8, offY + renderH - 8 - sumLines.length * (sumFont + 4) - 8, sumLines, "rgba(15,23,42,0.88)", sumFont);
+            ctx.font = "700 " + FONT_SIZE + "px 'JetBrains Mono', monospace";
+          }
+        });
+      }
+
+      window.addEventListener("resize", function () {
+        if (lastDrawPredictions && previewFrame.classList.contains("has-image")) {
+          drawBoxes(lastDrawPredictions);
+        }
+      });
+
+      function applyPreviewFromInput() {
+        if (lastPreviewUrl) {
+          URL.revokeObjectURL(lastPreviewUrl);
+          lastPreviewUrl = null;
+        }
+        clearCanvas();
+        pendingUploadFile = null;
+        if (!fileInput.files || !fileInput.files.length) {
+          previewFrame.classList.remove("has-image");
+          preview.removeAttribute("src");
+          showPreviewPlaceholder("Chưa có ảnh");
+          return Promise.resolve();
+        }
+
+        var raw = fileInput.files[0];
+        if (isHeicFile(raw)) {
+          previewFrame.classList.remove("has-image");
+          preview.removeAttribute("src");
+          showPreviewPlaceholder("Đang chuyển HEIC → JPG để xem trước…");
+        }
+
+        return prepareImageFile(raw)
+          .then(function (ready) {
+            pendingUploadFile = ready;
+            lastPreviewUrl = URL.createObjectURL(ready);
+            preview.onerror = function () {
+              previewFrame.classList.remove("has-image");
+              showPreviewPlaceholder("Không hiển thị được ảnh. Thử JPG/PNG.");
+            };
+            preview.onload = function () {
+              if (previewPlaceholder) previewPlaceholder.style.display = "none";
+            };
+            preview.src = lastPreviewUrl;
+            previewFrame.classList.add("has-image");
+          })
+          .catch(function (err) {
+            previewFrame.classList.remove("has-image");
+            preview.removeAttribute("src");
+            showPreviewPlaceholder("Lỗi: " + err.message);
+          });
+      }
+
+      fileZone.addEventListener("dragenter", function (e) {
+        e.preventDefault();
+        dragDepth += 1;
+        fileZone.classList.add("is-drag");
+      });
+      fileZone.addEventListener("dragleave", function (e) {
+        e.preventDefault();
+        dragDepth -= 1;
+        if (dragDepth <= 0) {
+          dragDepth = 0;
+          fileZone.classList.remove("is-drag");
+        }
+      });
+      fileZone.addEventListener("dragover", function (e) {
+        e.preventDefault();
+        if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
+      });
+      fileZone.addEventListener("drop", function (e) {
+        e.preventDefault();
+        dragDepth = 0;
+        fileZone.classList.remove("is-drag");
+        var dt = e.dataTransfer;
+        if (!dt || !dt.files || !dt.files.length) return;
+        try {
+          fileInput.files = dt.files;
+        } catch (err) {
+          return;
+        }
+        fileInput.dispatchEvent(new Event("change", { bubbles: true }));
+      });
+
       fileInput.addEventListener("change", function () {
         lastPayload = null;
         confirmBtn.disabled = true;
-        setText(confirmNote, "");
-        analyzeBtn.disabled = !fileInput.files || !fileInput.files.length;
-        if (!fileInput.files || !fileInput.files.length) {
-          preview.hidden = true;
-          return;
-        }
-        var url = URL.createObjectURL(fileInput.files[0]);
-        preview.src = url;
-        preview.hidden = false;
+        showConfirmNote("");
+        analyzeBtn.disabled = true;
+        applyPreviewFromInput().then(function () {
+          analyzeBtn.disabled = !pendingUploadFile;
+        });
       });
 
       analyzeBtn.addEventListener("click", function () {
-        if (!fileInput.files || !fileInput.files.length) return;
+        if (!pendingUploadFile) return;
         var fd = new FormData();
-        fd.append("image", fileInput.files[0]);
+        fd.append("image", pendingUploadFile, pendingUploadFile.name || "image.jpg");
 
         busy.hidden = false;
         analyzeBtn.disabled = true;
         setText(resultEl, "Đang gửi…");
+        clearCanvas();
 
         fetch("/api/v1/classify-upload", { method: "POST", body: fd })
           .then(function (r) {
-            return r.json().then(function (j) {
-              if (!r.ok) throw new Error(j.detail || r.statusText || String(r.status));
-              return j;
+            if (r.ok) return r.json();
+            return parseApiError(r).then(function (msg) {
+              throw new Error(msg || String(r.status));
             });
           })
           .then(function (data) {
@@ -117,21 +1191,46 @@
             if (data.primary_class) pickType.value = data.primary_class;
             else pickType.selectedIndex = 0;
 
+            // Vẽ bounding boxes lên canvas
+            var hasBboxes = data.predictions && data.predictions.some(function (p) {
+              return p.boxes && p.boxes.length > 0;
+            });
+            if (hasBboxes) {
+              // Đợi img render xong rồi mới vẽ
+              if (preview.complete && preview.naturalWidth) {
+                drawBoxes(data.predictions);
+              } else {
+                preview.onload = function () { drawBoxes(data.predictions); };
+              }
+            }
+
             var lines = [];
             if (data.model_version && String(data.model_version).includes("demo-no-weights")) {
-              lines.push("⚠ Kết quả DEMO (không có weights thật — chỉ để thử UI)");
+              lines.push("Cảnh báo: kết quả DEMO (chưa có weights thật — chỉ để thử UI)");
             }
             lines.push("action: " + data.action);
             lines.push("severity: " + data.severity + " (BR-AI-003 v1 — tỷ lệ vùng ô nhiễm trên ảnh)");
             lines.push("pollution_coverage_ratio: " + data.pollution_coverage_ratio);
             lines.push("image_relevance: " + data.image_relevance);
-            lines.push("  → POLLUTION_LIKELY: nên là cảnh báo cáo ô nhiễm | NOT_...: nghi ảnh không liên quan | UNCLEAR: cần người duyệt");
+            lines.push("  → POLLUTION_LIKELY: cảnh báo cảnh ô nhiễm | NOT_*: ảnh không liên quan | UNCLEAR: cần duyệt");
             lines.push("primary_class (loại ô nhiễm chính): " + (data.primary_class || "(none)"));
             lines.push("confidence: " + data.confidence);
-            lines.push("model_version: " + data.model_version);
+            lines.push("model_version (audit): " + data.model_version);
+            lines.push("yolo_active: " + data.yolo_active + " | detector_model_version: " + (data.detector_model_version || "(off)"));
+            lines.push(
+              "scene_classifier_active: " + data.scene_classifier_active +
+              " | scene_model_version: " + (data.scene_model_version || "(off)")
+            );
+            lines.push(
+              "trash_subtype_active: " + !!data.trash_subtype_active +
+              " (bật TRASH_SUBTYPE_MODEL_PATH trong .env)"
+            );
+            if (data.scene_scores) {
+              lines.push("scene_scores (WATER/SMOKE): " + JSON.stringify(data.scene_scores));
+            }
             lines.push("inference_time_ms: " + data.inference_time_ms);
             lines.push("noise_supported: " + data.noise_supported);
-            lines.push("predictions: " + JSON.stringify(data.predictions));
+            lines.push("predictions: " + JSON.stringify(data.predictions, null, 2));
             setText(resultEl, lines.join("\n"));
           })
           .catch(function (e) {
@@ -148,14 +1247,14 @@
       confirmBtn.addEventListener("click", function () {
         var v = pickType.value;
         if (!v) {
-          setText(confirmNote, "Hãy chọn một loại trước khi xác nhận.");
+          showConfirmNote("Hãy chọn một loại trước khi xác nhận.");
           return;
         }
         var suggested = lastPayload ? lastPayload.primary_class : null;
         var action = lastPayload ? lastPayload.action : null;
         var msg = "Đã ghi nhận (demo client-only): confirmed_type=" + v;
         if (suggested) msg += ", ai_suggestion=" + suggested + ", ai_action=" + action;
-        setText(confirmNote, msg);
+        showConfirmNote(msg);
       });
     })();
   </script>
