@@ -1,0 +1,70 @@
+<svg viewBox="0 0 775 258" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:Arial,sans-serif;background:#fff">
+  <defs>
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6 Z" fill="#222"/>
+    </marker>
+  </defs>
+
+  <rect width="775" height="258" fill="#fff"/>
+
+  <!-- INPUT -->
+  <rect x="8" y="97" width="82" height="58" rx="3" fill="#f5f5f5" stroke="#333" stroke-width="1.2"/>
+  <text x="49" y="121" text-anchor="middle" font-size="11" font-weight="bold" fill="#111">Input</text>
+  <text x="49" y="137" text-anchor="middle" font-size="10" fill="#555">Image</text>
+
+  <!-- Fork from input right edge to branch point -->
+  <line x1="90" y1="126" x2="112" y2="126" stroke="#333" stroke-width="1.2"/>
+  <polyline points="112,126 112,55 132,55" fill="none" stroke="#333" stroke-width="1.2" marker-end="url(#ah)"/>
+  <polyline points="112,126 112,197 132,197" fill="none" stroke="#333" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <!-- Parallel indicator -->
+  <line x1="120" y1="68" x2="120" y2="184" stroke="#bbb" stroke-width="0.8" stroke-dasharray="3,3"/>
+  <text x="124" y="130" font-size="9" fill="#aaa" font-style="italic">parallel</text>
+
+  <!-- STAGE 1: YOLOv8n -->
+  <rect x="132" y="26" width="154" height="58" rx="3" fill="#ebebeb" stroke="#333" stroke-width="1.2"/>
+  <text x="209" y="50" text-anchor="middle" font-size="11" font-weight="bold" fill="#111">Stage 1: YOLOv8n</text>
+  <text x="209" y="65" text-anchor="middle" font-size="10" fill="#555">Object Detection</text>
+  <text x="209" y="96" text-anchor="middle" font-size="9" fill="#888">&#8594; TRASH / WATER bboxes</text>
+
+  <!-- STAGE 2: Scene Classifier -->
+  <rect x="132" y="168" width="154" height="58" rx="3" fill="#ebebeb" stroke="#333" stroke-width="1.2"/>
+  <text x="209" y="192" text-anchor="middle" font-size="11" font-weight="bold" fill="#111">Stage 2: Scene Cls.</text>
+  <text x="209" y="207" text-anchor="middle" font-size="10" fill="#555">EfficientNet-B0</text>
+  <text x="209" y="238" text-anchor="middle" font-size="9" fill="#888">&#8594; P(WATER | image)</text>
+
+  <!-- Arrows Stage1/2 to Fusion -->
+  <polyline points="286,55 312,55 312,116 334,116" fill="none" stroke="#333" stroke-width="1.2" marker-end="url(#ah)"/>
+  <polyline points="286,197 312,197 312,136 334,136" fill="none" stroke="#333" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <!-- FUSION / EVIDENCE-GATING -->
+  <rect x="334" y="97" width="100" height="58" rx="3" fill="#d9d9d9" stroke="#222" stroke-width="1.6"/>
+  <text x="384" y="121" text-anchor="middle" font-size="11" font-weight="bold" fill="#111">Evidence</text>
+  <text x="384" y="136" text-anchor="middle" font-size="11" font-weight="bold" fill="#111">Gating</text>
+  <text x="384" y="166" text-anchor="middle" font-size="9" fill="#666">&#8805; 1 box required</text>
+
+  <!-- Arrow Fusion to Stage3 -->
+  <line x1="434" y1="126" x2="472" y2="126" stroke="#333" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <!-- STAGE 3 (conditional, dashed) -->
+  <rect x="472" y="97" width="142" height="58" rx="3" fill="#fafafa" stroke="#444" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="543" y="121" text-anchor="middle" font-size="11" font-weight="bold" fill="#111">Stage 3: Subtype &#8224;</text>
+  <text x="543" y="136" text-anchor="middle" font-size="10" fill="#555">EfficientNet-B0</text>
+  <text x="543" y="166" text-anchor="middle" font-size="9" fill="#888">&#8224; conditional on TRASH</text>
+
+  <!-- Arrow Stage3 to Output -->
+  <line x1="614" y1="126" x2="648" y2="126" stroke="#333" stroke-width="1.2" marker-end="url(#ah)"/>
+
+  <!-- OUTPUT box -->
+  <rect x="648" y="86" width="120" height="94" rx="3" fill="#f5f5f5" stroke="#333" stroke-width="1"/>
+  <text x="708" y="102" text-anchor="middle" font-size="10" font-weight="bold" fill="#222">Output</text>
+  <line x1="651" y1="107" x2="765" y2="107" stroke="#ccc" stroke-width="0.8"/>
+  <text x="655" y="120" font-size="9" fill="#333">&#8226; Bounding boxes</text>
+  <text x="655" y="133" font-size="9" fill="#333">&#8226; Subtype (7 classes)</text>
+  <text x="655" y="146" font-size="9" fill="#333">&#8226; PCR score</text>
+  <text x="655" y="159" font-size="9" fill="#333">&#8226; Severity band</text>
+  <text x="655" y="172" font-size="9" fill="#333">&#8226; Action</text>
+
+  <!-- Caption -->
+  <text x="387" y="250" text-anchor="middle" font-size="10" fill="#555">Fig. 1. GreenLens three-stage cascade ensemble pipeline.</text>
+</svg>

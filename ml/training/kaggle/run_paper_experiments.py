@@ -51,8 +51,11 @@ def _extract_dataset(zip_path: Path, dest: Path) -> None:
         inner.rmdir()
 
 
-def _write_data_yaml(root: Path) -> Path:
-    yaml_path = root / "data.yaml"
+def _write_data_yaml(root: Path, *, yaml_dir: Path | None = None) -> Path:
+    """Write Ultralytics data.yaml. Use yaml_dir when root is read-only (e.g. /kaggle/input)."""
+    dest_dir = yaml_dir if yaml_dir is not None else root
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    yaml_path = dest_dir / "data.yaml"
     content = f"""path: {root.as_posix()}
 train: images/train
 val: images/val
@@ -79,7 +82,9 @@ def _metrics_from_val(results: Any) -> dict[str, Any]:
         "per_class": {},
     }
     maps50 = list(box.maps50) if hasattr(box, "maps50") and box.maps50 is not None else []
-    # Fallback: single map list
+    if not maps50 and hasattr(box, "ap50") and callable(box.ap50):
+        maps50 = list(box.ap50())
+    # Fallback: per-class mAP@0.5:0.95 list (older API)
     if not maps50 and hasattr(box, "maps") and box.maps is not None:
         maps50 = list(box.maps)
 
@@ -267,7 +272,10 @@ def main() -> int:
         _extract_dataset(zip_path, work)
         data_root = work
 
-    data_yaml = _write_data_yaml(data_root)
+    yaml_dir = out_dir if not os.access(data_root, os.W_OK) else None
+    if yaml_dir is not None:
+        print(f"Dataset read-only ({data_root}) — writing data.yaml to {yaml_dir}")
+    data_yaml = _write_data_yaml(data_root, yaml_dir=yaml_dir)
     runs_project = out_dir / "runs"
     experiments: list[dict[str, Any]] = []
 

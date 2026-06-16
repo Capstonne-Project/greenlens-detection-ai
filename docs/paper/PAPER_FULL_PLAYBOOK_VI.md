@@ -4,7 +4,7 @@
 >
 > **Khớp codebase:** 2 lớp detection `TRASH` / `WATER` · Scene `WATER` / `NEGATIVE` · Subtype 7 lớp · FastAPI pipeline.
 >
-> **Cập nhật:** 2026-06-07
+> **Cập nhật:** 2026-06-08
 > **Train trước — viết docs sau.** Cập nhật cột **Trạng thái** và § [Kết quả thực tế](#kết-quả-thực-tế--cập-nhật-sau-mỗi-bước) sau mỗi bước xong.
 
 ---
@@ -13,14 +13,14 @@
 
 | Bước | Việc | Trạng thái | Ngày | Output / ghi chú |
 |------|------|------------|------|------------------|
-| **0** | Dataset gộp + test khóa | ✅ Xong | | `merged_dataset.zip` |
-| **E0** | Eval COCO không fine-tune | ⬜ Chưa | | `paper_output/E0/` |
-| **E1** | Train + eval YOLOv8n | ⬜ Chưa | | `paper_output/E1/best.pt` |
-| **E1b** | (Tuỳ chọn) Train YOLOv8s | ⬜ Bỏ qua | | So model lớn hơn |
+| **0** | Dataset gộp + test khóa | ✅ Xong | | `Pollution_merge_VN+NATION` · train 1147 / test 207 |
+| **E0** | Eval COCO không fine-tune | ✅ Xong | 2026-06-07 | Local — ALL mAP50 **0.0001** → `ml/paper_output/BANG_IV.md` |
+| **E1** | Train + eval YOLOv8n | 🔄 Số có, thiếu weight | 2026-06-08 | Kaggle — mAP50 **0.684**; `best.pt` mất (Commit lỗi cell cuối) → **train lại** |
+| **E1b** | (Tuỳ chọn) Train YOLOv8s | ⏭ Bỏ qua | | So model lớn hơn |
 | **E2** | Train scene + đo FP WATER | ⬜ Chưa | | `scene_classifier.pt` |
 | **E3** | Train subtype + F1 | ⬜ Chưa | | `trash_subtype_classifier.pt` |
-| **Hình** | Learning curve + predict | ⬜ Chưa | | `results.csv`, `fig*.png` |
-| **Docs** | Viết paper §1–§7 | ⬜ Để sau | | Sau khi Bảng IV đủ số |
+| **Hình** | Learning curve + predict | ⬜ Chưa | | Cần `E1/results.csv` sau khi có `best.pt` |
+| **Docs** | Viết paper §1–§7 | ⬜ Để sau | | Bảng IV đã có E0+E1 số |
 
 **Legend:** ⬜ Chưa · 🔄 Đang chạy · ✅ Xong · ⏭ Bỏ qua
 
@@ -246,17 +246,23 @@ Detection metrics (mAP) **dùng chung E1** — E2/E3 bổ sung Bảng V và VI, 
 
 ### Bảng IV — KẾT QUẢ THỰC TẾ (auto-generated)
 
+> Đồng bộ từ `ml/paper_output/BANG_IV.md` — cập nhật 2026-06-08.
+
 | Vai trò | Method | Fine-tune | TRASH mAP50 | WATER mAP50 | ALL mAP50 | TRASH P | WATER P |
 |---------|--------|-----------|-------------|-------------|-----------|---------|---------|
-| Baseline | E0 YOLOv8n-COCO | Không | _chưa chạy_ | _chưa chạy_ | _chưa chạy_ | — | — |
-| Baseline FT | E1 FT-YOLOv8n _(detector GreenLens)_ | Có | _chưa chạy_ | _chưa chạy_ | _chưa chạy_ | — | — |
+| Baseline | E0 YOLOv8n-COCO | Không | 0.0001 | 0.0 | 0.0001 | 0.0023 | 0.0 |
+| Baseline FT | E1 FT-YOLOv8n _(detector GreenLens)_ | Có | 0.654 | 0.713 | 0.684 | 0.628 | 0.658 |
 | Baseline (opt) | E1b FT-YOLOv8s | Có | _tuỳ chọn_ | _tuỳ chọn_ | _tuỳ chọn_ | — | — |
-| **Ours** | **E2 GreenLens-Det** | Có | _= E1_ | _Bảng V_ | _= E1_ | — | — |
-| **Ours ★** | **E3 GreenLens-Full** | Có | _= E1_ | _Bảng V_ | _= E1_ | — | — |
+| **Ours** | **E2 GreenLens-Det** | Có | = E1 | _Bảng V_ | = E1 | — | — |
+| **Ours ★** | **E3 GreenLens-Full** | Có | = E1 | _Bảng V_ | = E1 | — | — |
 
-**★ E3 = model đề xuất chính (toàn pipeline).** Kaggle script hiện auto-fill **E0 + E1**; E2/E3 điền sau khi train scene/subtype.
+**★ E3 = model đề xuất chính (toàn pipeline).** E2/E3 điền Bảng V/VI sau train scene/subtype.
 
-**ΔmAP E1 vs E0:** _TBD%_ (điền sau khi có số)
+**ΔmAP E1 vs E0:** E0 ≈ 0 → E1 **0.684** (fine-tune domain bắt buộc).
+
+**Lệnh E0 (local):** `uv run python ml/training/kaggle/run_paper_experiments.py --mode e0 --dataset-dir "<merged>" --output-dir ml/paper_output --imgsz 1280`
+
+**E1:** Kaggle notebook, test 207 ảnh, Ultralytics 8.4. `best.pt` cần train lại + Commit (2 cell, không GitHub).
 
 ---
 
