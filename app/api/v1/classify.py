@@ -20,7 +20,7 @@ from app.utils.logger import get_logger
 router = APIRouter(tags=["classification"])
 
 
-_MAX_CLASSIFY_BYTES = 20 * 1024 * 1024
+_MAX_CLASSIFY_BYTES = 100 * 1024 * 1024
 
 
 def classify_image_bytes_to_response(image_bytes: bytes) -> ClassifyResponse:

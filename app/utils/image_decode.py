@@ -57,23 +57,30 @@ def _register_heif_opener() -> None:
         raise HeifDecoderUnavailableError(_HEIF_UNAVAILABLE_MSG) from exc
 
 
+_MAX_LONG_EDGE = 1920  # resize ảnh về max dimension này trước inference
+
+
 def decode_image_bytes_to_jpeg(
     data: bytes,
     *,
     filename: str | None = None,
     quality: int = 90,
+    max_long_edge: int = _MAX_LONG_EDGE,
 ) -> tuple[bytes, str]:
-    """Open image bytes with Pillow (+ HEIF plugin) and return JPEG."""
+    """Open image bytes with Pillow (+ HEIF plugin), resize if needed, return JPEG."""
     if not data:
         raise ValueError("File ảnh rỗng.")
 
     if is_heic_upload(filename, data):
         _register_heif_opener()
 
-    from PIL import Image
+    from PIL import Image, ImageFile
+
+    ImageFile.LOAD_TRUNCATED_IMAGES = True
 
     try:
         with Image.open(io.BytesIO(data)) as im:
+            im.load()
             rgb = im.convert("RGB")
     except Exception as exc:
         hint = (
@@ -84,6 +91,11 @@ def decode_image_bytes_to_jpeg(
         )
         raise ValueError(f"Không đọc được ảnh.{hint}") from exc
 
+    w, h = rgb.size
+    if max(w, h) > max_long_edge:
+        scale = max_long_edge / max(w, h)
+        rgb = rgb.resize((int(w * scale), int(h * scale)), Image.LANCZOS)
+
     out = io.BytesIO()
     rgb.save(out, format="JPEG", quality=quality, optimize=True)
     stem = Path(filename or "image").stem
@@ -91,8 +103,6 @@ def decode_image_bytes_to_jpeg(
 
 
 def normalize_classify_image_bytes(data: bytes, filename: str | None = None) -> bytes:
-    """Return bytes suitable for YOLO/Pillow classify (JPEG when input is HEIC)."""
-    if is_heic_upload(filename, data):
-        jpeg_bytes, _ = decode_image_bytes_to_jpeg(data, filename=filename)
-        return jpeg_bytes
-    return data
+    """Decode, resize if needed, and return JPEG bytes for YOLO/Pillow classify."""
+    jpeg_bytes, _ = decode_image_bytes_to_jpeg(data, filename=filename)
+    return jpeg_bytes

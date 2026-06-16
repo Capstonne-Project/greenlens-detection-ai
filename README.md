@@ -1,204 +1,366 @@
-# AI Service
+<div align="center">
 
-AI microservice cho hệ thống báo cáo ô nhiễm môi trường (SU26SE049).
+<!-- 3D Animated Header -->
+<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=200&section=header&text=GreenLens%20AI&fontSize=60&fontColor=fff&animation=twinkling&fontAlignY=35&desc=Environmental%20Pollution%20Detection%20Microservice&descAlignY=55&descSize=18" width="100%"/>
 
-## Quick Start
+<!-- Animated badges -->
+<p>
+  <img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
+  <img src="https://img.shields.io/badge/FastAPI-0.136+-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
+  <img src="https://img.shields.io/badge/YOLOv8-Ultralytics-FF6B35?style=for-the-badge&logo=pytorch&logoColor=white"/>
+  <img src="https://img.shields.io/badge/EfficientNet-B0-764ABC?style=for-the-badge&logo=tensorflow&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white"/>
+</p>
 
-```cmd
-uv sync
-uv run uvicorn app.main:app --reload
+<p>
+  <img src="https://img.shields.io/badge/Project-SU26SE049-00C851?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge"/>
+  <img src="https://img.shields.io/badge/License-Academic-orange?style=for-the-badge"/>
+</p>
+
+<!-- Animated typing -->
+<a href="https://git.io/typing-svg">
+  <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&size=18&pause=1000&color=00C851&center=true&vCenter=true&multiline=true&width=600&height=80&lines=AI+microservice+ph%C3%A2n+lo%E1%BA%A1i+%C3%B4+nhi%E1%BB%85m+m%C3%B4i+tr%C6%B0%E1%BB%9Dng+%F0%9F%8C%BF;TRASH+%E2%80%A2+WATER+%E2%80%A2+SMOKE+%E2%80%A2+CHEMICAL+detection" alt="Typing SVG" />
+</a>
+
+</div>
+
+---
+
+## 🗺️ Mindmap — Kiến trúc hệ thống
+
+```
+                         ┌─────────────────────────────┐
+                         │       GreenLens AI 🌿        │
+                         │   FastAPI Microservice        │
+                         └──────────┬──────────────────-┘
+                                    │
+          ┌─────────────────────────┼──────────────────────────┐
+          │                         │                          │
+   ┌──────▼──────┐         ┌────────▼────────┐        ┌───────▼───────┐
+   │  📡 API v1  │         │  🧠 AI Core     │        │  🗄️ Services  │
+   └──────┬──────┘         └────────┬────────┘        └───────┬───────┘
+          │                         │                          │
+   ┌──────┴──────────┐    ┌─────────┴──────────┐    ┌─────────┴──────────┐
+   │                 │    │                    │    │                    │
+   ▼                 ▼    ▼                    ▼    ▼                    ▼
+ /classify     /classify  PollutionClassifier  SceneClassifier  StorageService
+ (URL)         -upload    ┌──────────────┐     (EfficientNet)   (S3/MinIO/HTTP)
+               │          │  YOLOv8      │
+ /verify-image │          │  Detection   │     TrashSubtype     TrainingJobs
+ /check-dup    │          ├──────────────┤     Classifier       (Background)
+ /training/*   │          │  Severity    │
+               │          │  Estimator   │     ImageDecode      WandB Logger
+               │          └──────────────┘     (HEIC/JPEG/PNG)
+               │
+       ┌───────┘
+       ▼
+   ImageFile
+   (HEIC/JPEG/PNG)
+   Auto-resize → 1920px
+   EXIF-safe decode
 ```
 
-Mở: http://localhost:8000/docs
+---
 
-## Local Fine-Tuning Dashboard (upload -> normalize -> train)
+## ✨ Tính năng
 
-Dashboard demo (local training orchestration): `http://localhost:8000/demo/demo_training_dashboard.html`
+| Feature | Mô tả |
+|---|---|
+| 🔍 **Object Detection** | YOLOv8 phát hiện ô nhiễm với bounding box |
+| 🏷️ **Scene Classification** | EfficientNet-B0 phân loại cảnh tổng thể |
+| 📊 **Severity Estimation** | Tự động đánh giá mức độ nghiêm trọng |
+| ♻️ **Trash Subtype** | Phân loại chi tiết loại rác |
+| 📱 **Mobile-First** | Nhận ảnh từ camera ĐT, tự resize, hỗ trợ HEIC |
+| 🎯 **4 Classes** | TRASH · WATER · SMOKE · CHEMICAL |
+| 🐳 **Docker Ready** | Deploy production với một lệnh |
+| 📈 **Training Dashboard** | Web UI upload dataset → train → monitor realtime |
 
-Supported flow:
+---
 
-1. Upload dataset zip with YOLO folders:
-   - `images/train`, `images/val`, `labels/train`, `labels/val`
-2. Service normalizes labels (class id + bbox range clamp) and stores dataset metadata.
-3. Create local training job (background) from web UI.
-4. Poll realtime logs + status + latest metrics from `results.csv`.
-5. Optional W&B logging (`enable_wandb` + project/entity/API key or local `WANDB_API_KEY`).
+## 🚀 Quick Start
 
-New endpoints:
+### 1. Clone & Setup
 
-- `POST /api/v1/training/datasets/upload`
-- `POST /api/v1/training/jobs`
-- `GET /api/v1/training/jobs`
-- `GET /api/v1/training/jobs/{job_id}`
-- `GET /api/v1/training/jobs/{job_id}/logs?offset=0&limit=20000`
+```bash
+git clone <repo_url>
+cd greenlens-detection-ai
+uv sync
+copy .env.example .env
+```
 
-## Run with Docker
+### 2. Download model weights
 
-```cmd
+```bash
+uv run python scripts/download_baseline_weights.py
+```
+
+### 3. Chạy server
+
+```bash
+uv run uvicorn app.main:app --host 0.0.0.0 --reload --port 8000
+```
+
+Mở Swagger UI: **http://localhost:8000/docs**
+
+---
+
+## 🐳 Docker
+
+```bash
 cd docker
 docker compose up --build
 ```
 
-## Run tests
+---
 
-```cmd
+## 🏗️ Project Structure
+
+```
+greenlens-detection-ai/
+├── app/
+│   ├── api/v1/
+│   │   ├── classify.py        # POST /classify, /classify-upload
+│   │   ├── images.py          # Image preview/convert endpoint
+│   │   ├── health.py          # GET /ready
+│   │   └── training.py        # Training job management
+│   ├── core/
+│   │   ├── pollution_classifier.py    # Orchestrator (YOLO + EfficientNet)
+│   │   ├── scene_classifier.py        # EfficientNet-B0
+│   │   ├── trash_subtype_classifier.py
+│   │   └── severity_estimator.py
+│   ├── services/
+│   │   └── storage_service.py  # S3 / HTTP / local file fetch
+│   └── utils/
+│       └── image_decode.py     # HEIC/JPEG/PNG decode + auto-resize
+├── ml/
+│   ├── weights/                # best.pt đặt ở đây
+│   └── training/               # train_yolo.py, scripts, README
+├── docker/
+│   └── docker-compose.yml
+├── scripts/
+│   └── download_baseline_weights.py
+└── .env.example
+```
+
+---
+
+## 🔌 API Endpoints
+
+```
+POST  /api/v1/classify            # Classify từ URL ảnh
+POST  /api/v1/classify-upload     # Classify từ file upload (camera/gallery)
+POST  /api/v1/images/preview      # Convert HEIC → JPEG preview
+GET   /api/v1/ready               # Health check + model_loaded status
+
+POST  /api/v1/training/datasets/upload   # Upload dataset ZIP
+POST  /api/v1/training/jobs              # Tạo training job
+GET   /api/v1/training/jobs              # List jobs
+GET   /api/v1/training/jobs/{id}         # Job status
+GET   /api/v1/training/jobs/{id}/logs    # Realtime logs
+```
+
+### Response mẫu `/classify-upload`
+
+```json
+{
+  "primary_class": "TRASH",
+  "confidence": 0.87,
+  "action": "REPORT",
+  "predictions": [
+    {
+      "pollutant_kind": "TRASH",
+      "confidence": 0.87,
+      "bbox_count": 3,
+      "boxes": [{"x1": 0.1, "y1": 0.2, "x2": 0.5, "y2": 0.6, "confidence": 0.87}]
+    }
+  ],
+  "model_version": "v3.0.0",
+  "yolo_active": true
+}
+```
+
+---
+
+## ⚙️ Cấu hình `.env`
+
+```env
+# Model
+MODEL_PATH=ml/weights/best.pt
+MODEL_VERSION=v3.0.0
+CLASSIFY_DEMO_MODE=false        # true = trả dữ liệu giả để test UI
+
+# Storage (tuỳ chọn — bỏ qua để dùng stub mode)
+STORAGE_STUB_MODE=true
+S3_ENDPOINT=http://localhost:9000
+S3_BUCKET=greenlens
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadmin
+```
+
+---
+
+## 🧪 Tests
+
+```bash
 uv run pytest -v
 ```
 
-## Bạn đang làm đồ án — nên làm gì tiếp?
+---
 
-Đã có API Phase 1–3 (`verify-image`, `check-duplicate`, `classify`, `classify-upload`) và trang demo chụp ảnh. Thứ tự khuyến nghị:
+## 📊 Model Performance (v3 — 1,373 ảnh)
 
-1. **`copy .env.example .env`** rồi chỉnh: `MODEL_PATH`, `MODEL_VERSION`; đặt **`CLASSIFY_DEMO_MODE=false`** nếu muốn kết quả không phải dữ liệu demo giả.
+| Class | mAP50 | Instances |
+|---|---|---|
+| TRASH | ~0.71 | 60 val |
+| SMOKE | ~0.65 | 57 val |
+| WATER | ~0.24 | 152 val |
 
-2. **Có file weights `.pt`:** huấn luyện / fine-tune theo nhãn dự án (TRASH, WATER, SMOKE, CHEMICAL) — xem Phase 3 trong `docs/AI_Service_Development_Plan.md`. File đặt tại ví dụ `ml\weights\best.pt`, trỏ `MODEL_PATH` tới đó.
+> WATER mAP thấp do class imbalance trong training data. Roadmap: bổ sung ảnh thực tế VN.
 
-   Chỉ cần file baseline COCO để kiểm tra pipeline và `GET /api/v1/ready` báo **model_loaded: true**:
+---
 
-   ```cmd
-   uv run python scripts\download_baseline_weights.py
-   ```
+## 🗺️ Mindmap — Luồng xử lý ảnh
 
-   _(Dự báo: COCO không map vào 4 nhãn ô nhiễm trong code hiện tại → `predictions` có thể vẫn rỗng; dùng khi chứng minh tích hợp Ultralytics đã hoạt động.)_
+```
+  📱 Điện thoại chụp ảnh
+          │
+          ▼
+  POST /classify-upload
+  (multipart/form-data)
+          │
+          ▼
+  ┌───────────────────┐
+  │   image_decode    │
+  │  ┌─────────────┐  │
+  │  │ HEIC? → reg │  │
+  │  │ heif opener │  │
+  │  └──────┬──────┘  │
+  │         ▼         │
+  │  Pillow decode    │
+  │  (truncate-safe)  │
+  │         ▼         │
+  │  > 1920px?        │
+  │  → resize (LANCZOS│
+  │         ▼         │
+  │  → JPEG bytes     │
+  └─────────┬─────────┘
+            │
+            ▼
+  ┌─────────────────────────────┐
+  │     PollutionClassifier     │
+  │                             │
+  │  ┌──────────┐ ┌──────────┐  │
+  │  │  YOLOv8  │ │EffNet-B0 │  │
+  │  │Detection │ │  Scene   │  │
+  │  └────┬─────┘ └────┬─────┘  │
+  │       │            │        │
+  │       ▼            ▼        │
+  │   Bounding    Scene label   │
+  │   Boxes +     + confidence  │
+  │   classes                   │
+  │       │            │        │
+  │       └─────┬──────┘        │
+  │             ▼               │
+  │    SeverityEstimator        │
+  │    TrashSubtypeClassifier   │
+  └─────────────┬───────────────┘
+                │
+                ▼
+        ClassifyResponse
+        (JSON → Mobile App)
+```
 
-3. **Chạy:**
+---
 
-   ```cmd
-   uv run uvicorn app.main:app --host 0.0.0.0 --reload --port 8000
-   ```
+## 🛠️ Tech Stack
 
-   Swagger: `/docs`. Demo luồng chụp: `/demo/demo_capture_classify.html`.
+<div align="center">
 
-4. **Lưu trữ stripped ảnh thật (tuỳ chọn):** bật MinIO/S3, đặt `STORAGE_STUB_MODE=false` và biến `S3_*` trong `.env`.
+| Layer | Technology |
+|---|---|
+| **API Framework** | FastAPI + Uvicorn |
+| **Detection** | YOLOv8 (Ultralytics) |
+| **Classification** | EfficientNet-B0 (PyTorch) |
+| **Image Processing** | Pillow 12 + pillow-heif |
+| **Storage** | AWS S3 / MinIO |
+| **Package Manager** | uv |
+| **Logging** | structlog |
+| **Training Monitor** | Weights & Biases |
+| **Container** | Docker Compose |
 
-5. **Hợp đồng với .NET / App:** họ gửi URL ảnh + JWT nội bộ; không public API AI trực tiếp từ web production. Chi tiết tích hợp FE: `docs/plans/phase-fe-app-web-ai-integration.md`.
+</div>
 
-6. **Roadmap chức năng còn thiếu so master plan:** severity, manipulation, worker timeout BR-AI-006, verify-cleanup, export TFLite — `docs/plans/phase-ai-p4-p7-*.md` và `phase-ai-p8-p9-*.md`.
+---
 
-7. **Huấn luyện model thật (`best.pt`):** các bước chi tiết + script — `ml/training/README.md` và `uv run python ml\training\train_yolo.py`.
+## 🗺️ Mindmap — Training Pipeline
 
-8. **Dataset thật đủ combo 4 lớp (không demo):** quy trình + nguồn gợi ý — `ml/training/DATASET_GUIDE_VI.md`; kiểm tra dữ liệu — `ml/training/scripts/verify_yolo_dataset.py`.
+```
+  📁 Dataset (YOLO format)
+  images/train + images/val
+  labels/train + labels/val
+          │
+          ▼
+  Training Dashboard (Web UI)
+  localhost:8000/demo/demo_training_dashboard.html
+          │
+          ▼
+  POST /api/v1/training/datasets/upload
+  → normalize labels
+  → store metadata
+          │
+          ▼
+  POST /api/v1/training/jobs
+  → background training job
+          │
+          ├──→ YOLOv8 train
+          │      imgsz=1280
+          │      epochs=150
+          │      pretrained=yolov8n.pt
+          │
+          ├──→ W&B logging (optional)
+          │
+          ▼
+  GET /api/v1/training/jobs/{id}/logs
+  → realtime stdout stream
+          │
+          ▼
+  ml/training/runs/web_jobs/{id}/
+  ├── weights/best.pt   ← deploy này
+  ├── results.csv       ← mAP50 chart
+  └── args.yaml         ← verify config
+```
 
-4) Kiểm tra model load thật
-   Mở:
-   uv run uvicorn app.main:app
+---
 
-http://127.0.0.1:8000/api/v1/ready
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+## 📱 Tích hợp Mobile App
 
-Kỳ vọng:
+Mobile App (.NET MAUI / React Native) giao tiếp qua **internal JWT** — không expose AI API trực tiếp ra internet:
 
-"model_loaded": true 5) Test feature
-http://127.0.0.1:8000/demo/demo_capture_classify.html
-Hoặc /docs gọi POST /api/v1/classify-upload
-Quan sát các field:
+```
+Mobile App
+    │  POST image (multipart)
+    ▼
+.NET Backend (API Gateway)
+    │  Verify JWT
+    │  Forward bytes
+    ▼
+GreenLens AI (internal)
+    │  classify_upload()
+    ▼
+ClassifyResponse → Mobile App
+```
 
-Bước 1 — Mày push code (làm ngay)
+Chi tiết: `docs/plans/phase-fe-app-web-ai-integration.md`
 
-git add -A
-git commit -m "chore: training config + retrain action plan"
-git push origin dev
-Bước 2 — Người kia pull + setup môi trường
+---
 
-git clone <repo_url>
-cd greenlens-detection-ai
-uv sync # cài dependencies
-copy .env.example .env # tạo .env
+<div align="center">
 
-# Sửa .env: CLASSIFY_DEMO_MODE=false, MODEL_PATH=ml/weights/best.pt
+<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=100&section=footer" width="100%"/>
 
-uv run python scripts/download_baseline_weights.py # tự download yolov8n.pt
-Bước 3 — Share dataset (phần tốn công nhất)
-Mày có 2 cách:
+**SU26SE049 — Capstone Project 2026**
 
-Cách A — USB/Google Drive (đơn giản)
+Made with 💚 for a cleaner environment
 
-Copy toàn bộ D:\CapsoneProject\DATASETFINAL\ → USB → qua máy kia
-Cách B — Roboflow (sạch hơn, vì dataset của mày từ Roboflow)
-
-Share workspace Roboflow với người kia
-Họ export lại → upload qua Training Dashboard
-Bước 4 — Người kia start server + train
-
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-# Mở http://localhost:8000/static/demo/demo_training_dashboard.html
-
-# Upload dataset ZIP → Cấu hình train → Start
-
-Tóm tắt
-Thứ Cách share
-Code git push ✅
-yolov8n.pt Script tự download ✅
-Dataset USB hoặc Roboflow share ⚠️
-.env Tự tạo từ .env.example ✅
-Mày muốn tao giúp viết .env.example đầy đủ không để người kia setup dễ hơn?
-
-khi người kia train xong thì kêu ng đó gửi những gì cho tui để tui set được bên tui ?
-Chỉ cần 1 file duy nhất
-
-best.pt
-Đường dẫn đầy đủ trên máy người kia:
-
-ml/training/runs/web_jobs/<job_id>/output/pollution_detect/weights/best.pt
-Sau khi nhận được best.pt
-Bước 1 — Copy vào đúng chỗ:
-
-Copy-Item "best.pt" "ml\weights\best.pt" -Force
-Bước 2 — Cập nhật .env:
-
-MODEL_PATH=ml/weights/best.pt
-MODEL_VERSION=v3.0.0-3class-150ep-1280px
-Bước 3 — Restart server:
-
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-Nếu muốn có thêm số liệu để viết paper
-Kêu người kia gửi thêm 2 file này:
-
-File Dùng để làm gì
-results.csv Bảng mAP50 theo từng epoch → vẽ biểu đồ
-args.yaml Xác nhận config đúng (imgsz=1280, yolov8n.pt sạch)
-Cả 2 file nằm cùng thư mục với best.pt:
-
-ml/training/runs/web_jobs/<job_id>/output/pollution_detect/
-├── weights/
-│ └── best.pt ← bắt buộc
-├── results.csv ← cần cho paper
-└── args.yaml ← để verify
-
-📊 Tỷ lệ Train/Val/Test Dataset
-Dataset đang dùng (train trên Kaggle vừa xong)
-Tui tìm được dataset ds_dbd5573b0d_normalized — khớp với kết quả Kaggle (158 val images):
-
-Split Số ảnh Tỷ lệ
-Train 1,214 88.4%
-Val 159 11.6%
-Test ❌ 0 0%
-Total 1,373 100%
-⚠️ Vấn đề nghiêm trọng với Paper
-Không có test set riêng biệt.
-
-Hiện tại val set đang làm cả 2 việc: vừa guide training, vừa đánh giá cuối. Đây là methodological flaw mà reviewer nào cũng sẽ bắt:
-
-❌ Sai: Train (88%) → Val (12%) → báo mAP50 từ Val
-✅ Đúng: Train (70%) → Val (15%) → Test (15%) → báo mAP50 từ Test
-🔧 Cần làm trước khi viết paper
-Tách test set ra ngay bây giờ, trước khi add data VN:
-
-Tỷ lệ chuẩn cho paper:
-Train : 70% → ~960 ảnh
-Val : 15% → ~206 ảnh (dùng trong training)
-Test : 15% → ~207 ảnh (chỉ dùng để báo kết quả cuối, không touch trong lúc train)
-Quan trọng: Test set phải được lock lại ngay — không được dùng để tune model, chỉ chạy 1 lần duy nhất để báo số liệu final.
-
-📋 Phân bổ theo class (ước tính từ training result)
-Class Val images Val instances Nhận xét
-TRASH 42 60 Ổn
-WATER 63 152 Nhiều instances nhưng model yếu → class imbalance trong train
-SMOKE 53 57 Tốt
-WATER có nhiều ảnh nhất nhưng mAP50 chỉ 0.242 → khả năng data quality vấn đề, không phải quantity.
-
-✅ Action plan
-Ngay hôm nay → Tách 15% làm test set, lock lại
-+4 ngày → Nhận 500 ảnh VN → split tương tự 70/15/15 → merge vào train+val
-Train lại → Báo mAP50 từ test set mới clean
+</div>

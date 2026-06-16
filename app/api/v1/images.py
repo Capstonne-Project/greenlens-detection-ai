@@ -10,7 +10,7 @@ from app.utils.image_decode import HeifDecoderUnavailableError, decode_image_byt
 
 router = APIRouter(prefix="/images", tags=["images"])
 
-_MAX_BYTES = 20 * 1024 * 1024
+_MAX_BYTES = 100 * 1024 * 1024
 
 
 @router.post("/normalize")
