@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     trash_subtype_model_path: str = ""
     trash_subtype_threshold: float = 0.40  # min confidence to report a subtype (vs UNKNOWN)
 
+    # ── Image compare (DINOv2) — BR-REP-030/BR-AI-002 Tier 2 duplicate detection ──
+    compare_model_name: str = "facebook/dinov2-base"  # HuggingFace model id (swap to dinov2-small)
+    compare_model_version: str = "dinov2-base"  # returned as `model`, BR-AI-005 audit label
+    compare_threshold: float = 0.80  # similarity >= threshold -> is_same_scene
+    compare_download_timeout_seconds: float = 3.0  # per-image URL fetch budget
+    compare_warmup_on_startup: bool = False  # preload DINOv2 in lifespan (protects 5s .NET budget)
+
 
 @lru_cache
 def get_settings() -> Settings:

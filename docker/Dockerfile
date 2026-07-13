@@ -37,6 +37,15 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 COPY app/ ./app/
 
+# DINOv2 compare weights (~330MB) download from HuggingFace on first load.
+# To keep the first /compare-images request inside the .NET 5s timeout, either:
+#   (a) uncomment the pre-download below to bake weights into the image (needs network at build), or
+#   (b) set COMPARE_WARMUP_ON_STARTUP=true so the model loads during app startup.
+# ENV HF_HOME=/app/.cache/huggingface
+# RUN python -c "from transformers import AutoImageProcessor, AutoModel; \
+#     AutoImageProcessor.from_pretrained('facebook/dinov2-base'); \
+#     AutoModel.from_pretrained('facebook/dinov2-base')"
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
