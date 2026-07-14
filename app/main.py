@@ -61,5 +61,6 @@ async def root():
         "version": "0.1.0",
         "docs": "/docs",
         "demo_capture_classify": "/demo/demo_capture_classify.html",
+        "demo_compare_images": "/demo/demo_compare_images.html",
         "demo_training_dashboard": "/demo/demo_training_dashboard.html",
     }

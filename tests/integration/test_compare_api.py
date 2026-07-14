@@ -99,3 +99,44 @@ async def test_compare_images_bad_url_returns_400(monkeypatch, two_jpegs):
 
     assert resp.status_code == 400
     assert "image_url_b" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_compare_images_upload_happy_path(monkeypatch, two_jpegs):
+    a_bytes = _minimal_jpeg((128, 64, 32))
+    b_bytes = _minimal_jpeg((32, 64, 128))
+    monkeypatch.setattr(compare, "get_image_compare_cached", lambda: _FakeCompare())
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.post(
+            "/api/v1/compare-images-upload",
+            files={
+                "image_a": ("a.jpg", a_bytes, "image/jpeg"),
+                "image_b": ("b.jpg", b_bytes, "image/jpeg"),
+            },
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["similarity"] == 0.87
+    assert data["is_same_scene"] is True
+    assert data["model"] == "dinov2-base"
+
+
+@pytest.mark.asyncio
+async def test_compare_images_upload_empty_file_returns_400(monkeypatch):
+    monkeypatch.setattr(compare, "get_image_compare_cached", lambda: _FakeCompare())
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.post(
+            "/api/v1/compare-images-upload",
+            files={
+                "image_a": ("a.jpg", b"", "image/jpeg"),
+                "image_b": ("b.jpg", _minimal_jpeg((1, 2, 3)), "image/jpeg"),
+            },
+        )
+
+    assert resp.status_code == 400
+    assert "image_a" in resp.json()["detail"]
