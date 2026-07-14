@@ -54,7 +54,7 @@ Citizen submit report
   │     │   ├── Tier 2 (optional): Gọi Python AI Service
   │     │   │   POST /api/v1/compare-images
   │     │   │   Body: { image_url_a: "report_mới.jpg", image_url_b: "candidate.jpg" }
-  │     │   │   Response: { similarity: 0.87, is_same_scene: true }
+  │     │   │   Response: { confidence: 0.87, is_same_scene: true }
   │     │   │   Timeout: 5s (fallback → dùng Tier 1 result)
   │     │   │
   │     │   └── Set on report:
@@ -117,7 +117,7 @@ public interface IAiImageCompareService
     Task<ImageCompareResult?> CompareAsync(string imageUrlA, string imageUrlB, CancellationToken ct);
 }
 
-public sealed record ImageCompareResult(decimal Similarity, bool IsSameScene);
+public sealed record ImageCompareResult(decimal Confidence, bool IsSameScene);
 ```
 
 #### [MODIFY] `Features/Reports/SubmitPollutionReport/SubmitPollutionReportCommandHandler.cs`
@@ -145,7 +145,7 @@ if (candidates.Count > 0)
             var result = await aiImageCompare.CompareAsync(reportImage, candidateImage, ct);
             if (result is not null)
             {
-                aiScore = result.Similarity;
+                aiScore = result.Confidence;
                 source = "geo_time_ai";
                 if (!result.IsSameScene) goto NoDuplicate; // AI says different → skip
             }

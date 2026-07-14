@@ -20,7 +20,7 @@ def _make_service(monkeypatch, vectors: dict[bytes, list[float]]) -> ImageCompar
 def test_identical_embeddings_same_scene(monkeypatch):
     svc = _make_service(monkeypatch, {b"a": [1.0, 2.0, 3.0], b"b": [1.0, 2.0, 3.0]})
     result = svc.compare_bytes(b"a", b"b")
-    assert result.similarity > 0.99
+    assert result.confidence > 0.99
     assert result.is_same_scene is True
     assert result.model == "dinov2-base"
 
@@ -28,7 +28,7 @@ def test_identical_embeddings_same_scene(monkeypatch):
 def test_orthogonal_embeddings_not_same_scene(monkeypatch):
     svc = _make_service(monkeypatch, {b"a": [1.0, 0.0], b"b": [0.0, 1.0]})
     result = svc.compare_bytes(b"a", b"b")
-    assert result.similarity < 0.5
+    assert result.confidence < 0.5
     assert result.is_same_scene is False
 
 

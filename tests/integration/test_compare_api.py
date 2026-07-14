@@ -30,17 +30,17 @@ def _two_jpegs(tmp_path: Path):
 class _FakeCompare:
     """Stub embedder — avoids downloading DINOv2 weights in tests."""
 
-    def __init__(self, *, loaded: bool = True, similarity: float = 0.87) -> None:
+    def __init__(self, *, loaded: bool = True, confidence: float = 0.87) -> None:
         self._loaded = loaded
-        self._similarity = similarity
+        self._confidence = confidence
 
     def model_is_loaded(self) -> bool:
         return self._loaded
 
     def compare_bytes(self, a: bytes, b: bytes) -> CompareResult:
         return CompareResult(
-            similarity=self._similarity,
-            is_same_scene=self._similarity >= 0.80,
+            confidence=self._confidence,
+            is_same_scene=self._confidence >= 0.80,
             model="dinov2-base",
         )
 
@@ -59,7 +59,7 @@ async def test_compare_images_happy_path(monkeypatch, two_jpegs):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["similarity"] == 0.87
+    assert data["confidence"] == 0.87
     assert data["is_same_scene"] is True
     assert data["model"] == "dinov2-base"
     assert data["processing_time_ms"] >= 0
@@ -119,7 +119,7 @@ async def test_compare_images_upload_happy_path(monkeypatch, two_jpegs):
 
     assert resp.status_code == 200
     data = resp.json()
-    assert data["similarity"] == 0.87
+    assert data["confidence"] == 0.87
     assert data["is_same_scene"] is True
     assert data["model"] == "dinov2-base"
 

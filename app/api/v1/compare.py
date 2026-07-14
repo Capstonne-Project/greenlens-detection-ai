@@ -61,7 +61,7 @@ def _run_compare(svc: ImageCompareService, blob_a: bytes, blob_b: bytes) -> Comp
 
 def _to_response(result: CompareResult, elapsed_ms: int) -> CompareResponse:
     return CompareResponse(
-        similarity=result.similarity,
+        confidence=result.confidence,
         is_same_scene=result.is_same_scene,
         model=result.model,
         processing_time_ms=elapsed_ms,
@@ -71,7 +71,7 @@ def _to_response(result: CompareResult, elapsed_ms: int) -> CompareResponse:
 def _log_compare(logger, result: CompareResult, elapsed_ms: int) -> None:
     logger.info(
         "compare_images",
-        similarity=result.similarity,
+        confidence=result.confidence,
         is_same_scene=result.is_same_scene,
         model=result.model,
         processing_ms=elapsed_ms,

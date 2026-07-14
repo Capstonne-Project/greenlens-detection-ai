@@ -36,7 +36,7 @@
 
 ```json
 {
-  "similarity": 0.87,
+  "confidence": 0.87,
   "is_same_scene": true,
   "model": "dinov2-base",
   "processing_time_ms": 142
@@ -45,7 +45,7 @@
 
 | Field | Type | Dùng thế nào |
 |---|---|---|
-| `similarity` | `0.0`–`1.0` | Lưu `AiSimilarityScore` |
+| `confidence` | `0.0`–`1.0` | Lưu `AiSimilarityScore` |
 | `is_same_scene` | `bool` | `false` → **không** flag duplicate (AI nói khác cảnh) |
 | `model` | `string` | Audit (optional log) |
 | `processing_time_ms` | `int` | Observability |
@@ -129,7 +129,7 @@ public interface IAiImageCompareService
 }
 
 public sealed record ImageCompareResult(
-    decimal Similarity,
+    decimal Confidence,
     bool IsSameScene,
     string Model,
     int ProcessingTimeMs);
@@ -140,8 +140,8 @@ DTO map JSON (snake_case từ Python):
 ```csharp
 internal sealed class CompareImagesResponseDto
 {
-    [JsonPropertyName("similarity")]
-    public decimal Similarity { get; init; }
+    [JsonPropertyName("confidence")]
+    public decimal Confidence { get; init; }
 
     [JsonPropertyName("is_same_scene")]
     public bool IsSameScene { get; init; }
@@ -214,7 +214,7 @@ internal sealed class AiImageCompareService(
                 return null;
 
             return new ImageCompareResult(
-                dto.Similarity,
+                dto.Confidence,
                 dto.IsSameScene,
                 dto.Model,
                 dto.ProcessingTimeMs);
@@ -252,7 +252,7 @@ else if (!result.IsSameScene)
 }
 else
 {
-    // MarkPossibleDuplicate(..., source: "geo_time_ai", aiScore: result.Similarity)
+    // MarkPossibleDuplicate(..., source: "geo_time_ai", aiScore: result.Confidence)
 }
 ```
 
@@ -281,7 +281,7 @@ try
         var ai = await aiImageCompare.CompareAsync(reportImage, candidateImage, ct);
         if (ai is not null)
         {
-            aiScore = ai.Similarity;
+                aiScore = ai.Confidence;
             source = "geo_time_ai";
 
             if (!ai.IsSameScene)
@@ -306,7 +306,7 @@ Tier 1 không có candidate     → không flag
 Tier 1 có candidate
   ├─ AI timeout / 4xx / 5xx   → flag, source = "geo_time", AiSimilarityScore = null
   ├─ AI is_same_scene = false → KHÔNG flag
-  └─ AI is_same_scene = true  → flag, source = "geo_time_ai", AiSimilarityScore = similarity
+  └─ AI is_same_scene = true  → flag, source = "geo_time_ai", AiSimilarityScore = confidence
 ```
 
 ---
@@ -318,8 +318,8 @@ Tier 1 có candidate
 3. [ ] URL ảnh R2 **public-readable** (AI download được trong ~3s/ảnh).
 4. [ ] `CompareAsync` trả `null` trên lỗi → không crash SubmitReport.
 5. [ ] `is_same_scene == false` → không `MarkPossibleDuplicate`.
-6. [ ] Log `similarity`, `model`, `processing_time_ms` khi success (audit BR-AI-005).
-7. [ ] Smoke test: cùng 1 URL 2 lần → `similarity` cao, `is_same_scene: true`.
+6. [ ] Log `confidence`, `model`, `processing_time_ms` khi success (audit BR-AI-005).
+7. [ ] Smoke test: cùng 1 URL 2 lần → `confidence` cao, `is_same_scene: true`.
 
 ### Curl tham chiếu (để .NET đối chiếu)
 

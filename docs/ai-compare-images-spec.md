@@ -62,7 +62,7 @@ So sánh 2 ảnh để xác định có phải cùng 1 điểm ô nhiễm/bãi r
 
 ```json
 {
-  "similarity": 0.87,
+  "confidence": 0.87,
   "is_same_scene": true,
   "model": "dinov2-base",
   "processing_time_ms": 142
@@ -71,8 +71,8 @@ So sánh 2 ảnh để xác định có phải cùng 1 điểm ô nhiễm/bãi r
 
 | Field | Type | Description |
 |---|---|---|
-| `similarity` | float (0.0–1.0) | Cosine similarity giữa 2 image embeddings |
-| `is_same_scene` | boolean | `true` nếu `similarity >= threshold` (recommend 0.80) |
+| `confidence` | float (0.0–1.0) | Độ tin cậy cùng cảnh (cosine similarity giữa 2 image embeddings) |
+| `is_same_scene` | boolean | `true` nếu `confidence >= threshold` (recommend 0.80) |
 | `model` | string | Tên model đã dùng (để audit) |
 | `processing_time_ms` | integer | Thời gian xử lý (ms) |
 
@@ -143,7 +143,7 @@ def compare_images(image_url_a: str, image_url_b: str) -> dict:
     similarity = torch.nn.functional.cosine_similarity(emb_a, emb_b).item()
     
     return {
-        "similarity": round(similarity, 4),
+        "confidence": round(similarity, 4),
         "is_same_scene": similarity >= 0.80,
         "model": "dinov2-base"
     }
@@ -163,7 +163,7 @@ class CompareRequest(BaseModel):
     image_url_b: str
 
 class CompareResponse(BaseModel):
-    similarity: float
+    confidence: float
     is_same_scene: bool
     model: str
     processing_time_ms: int
@@ -178,7 +178,7 @@ async def compare_images_endpoint(req: CompareRequest):
     
     elapsed_ms = int((time.time() - start) * 1000)
     return CompareResponse(
-        similarity=result["similarity"],
+        confidence=result["confidence"],
         is_same_scene=result["is_same_scene"],
         model=result["model"],
         processing_time_ms=elapsed_ms
@@ -225,9 +225,9 @@ Recommend bắt đầu với **threshold = 0.80** cho `is_same_scene`:
 - Timeout nội bộ > 4s → trả kết quả đang có hoặc 504
 
 ### Testing
-- Tạo test với 2 ảnh giống nhau (cùng góc) → expect similarity > 0.90
-- Tạo test với 2 ảnh cùng bãi rác, khác góc ~30° → expect similarity 0.75–0.90
-- Tạo test với 2 ảnh hoàn toàn khác nhau → expect similarity < 0.50
+- Tạo test với 2 ảnh giống nhau (cùng góc) → expect confidence > 0.90
+- Tạo test với 2 ảnh cùng bãi rác, khác góc ~30° → expect confidence 0.75–0.90
+- Tạo test với 2 ảnh hoàn toàn khác nhau → expect confidence < 0.50
 
 ### Deployment
 - Endpoint này sẽ được backend .NET gọi cùng pattern với `/api/v1/classify-moderation-upload`

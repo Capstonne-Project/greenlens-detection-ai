@@ -13,13 +13,13 @@ class CompareRequest(BaseModel):
 
 
 class CompareResponse(BaseModel):
-    similarity: float = Field(
+    confidence: float = Field(
         ge=0.0,
         le=1.0,
-        description="Cosine similarity giữa 2 image embeddings (DINOv2 [CLS], L2-normalized).",
+        description="Độ tin cậy cùng cảnh (cosine similarity embeddings DINOv2 [CLS], L2-normalized).",
     )
     is_same_scene: bool = Field(
-        description="True khi similarity >= COMPARE_THRESHOLD (mặc định 0.80).",
+        description="True khi confidence >= COMPARE_THRESHOLD (mặc định 0.80).",
     )
     model: str = Field(
         description="Nhãn model dùng để so sánh (BR-AI-005 audit), ví dụ 'dinov2-base'.",

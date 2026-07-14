@@ -17,7 +17,7 @@ from app.utils.image_decode import decode_image_bytes_to_jpeg
 
 @dataclass
 class CompareResult:
-    similarity: float
+    confidence: float
     is_same_scene: bool
     model: str
 
@@ -80,11 +80,11 @@ class ImageCompareService:
 
         emb_a = self._embed(image_a)
         emb_b = self._embed(image_b)
-        similarity = torch.nn.functional.cosine_similarity(emb_a, emb_b).item()
-        similarity = max(0.0, min(1.0, similarity))
+        score = torch.nn.functional.cosine_similarity(emb_a, emb_b).item()
+        score = max(0.0, min(1.0, score))
         threshold = self._settings.compare_threshold
         return CompareResult(
-            similarity=round(similarity, 4),
-            is_same_scene=similarity >= threshold,
+            confidence=round(score, 4),
+            is_same_scene=score >= threshold,
             model=self._settings.compare_model_version,
         )

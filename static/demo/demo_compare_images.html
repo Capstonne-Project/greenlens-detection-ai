@@ -233,10 +233,10 @@
             : "KHÁC CẢNH (is_same_scene = false)";
           resultEl.textContent =
             badge + "\n\n" +
-            "similarity: " + data.similarity + " (0–1, càng cao càng giống)\n" +
+            "confidence: " + data.confidence + " (0–1, càng cao càng giống)\n" +
             "model: " + data.model + "\n" +
             "processing_time_ms: " + data.processing_time_ms + "\n\n" +
-            "Ngưỡng mặc định: similarity >= 0.80 → is_same_scene\n\n" +
+            "Ngưỡng mặc định: confidence >= 0.80 → is_same_scene\n\n" +
             JSON.stringify(data, null, 2);
         })
         .catch(function (err) {
