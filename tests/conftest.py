@@ -8,5 +8,7 @@ def clear_pollution_classifier_cache():
     from app.api import deps
 
     deps.get_pollution_classifier_cached.cache_clear()
+    deps.get_image_compare_cached.cache_clear()
     yield
     deps.get_pollution_classifier_cached.cache_clear()
+    deps.get_image_compare_cached.cache_clear()

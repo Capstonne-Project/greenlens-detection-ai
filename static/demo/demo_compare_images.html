@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GreenLens — Demo so sánh ảnh (DINOv2)</title>
+  <style>
+    :root {
+      --brand: #059669;
+      --text: #0f172a;
+      --muted: #64748b;
+      --line: rgba(15, 23, 42, 0.1);
+      --surface: #fff;
+      --radius: 14px;
+      --font: system-ui, -apple-system, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: var(--font);
+      color: var(--text);
+      background: linear-gradient(160deg, #ecfdf5 0%, #e0f2fe 100%);
+      padding: 24px 16px 48px;
+    }
+    .wrap { max-width: 880px; margin: 0 auto; }
+    h1 { font-size: 1.5rem; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 24px; font-size: 0.95rem; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+    }
+    .card h2 { font-size: 0.9rem; margin: 0 0 12px; color: var(--muted); }
+    input[type="file"] { width: 100%; font-size: 0.85rem; }
+    .preview {
+      margin-top: 12px;
+      width: 100%;
+      aspect-ratio: 4/3;
+      object-fit: contain;
+      background: #f8fafc;
+      border-radius: 10px;
+      border: 1px dashed var(--line);
+    }
+    .actions { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; }
+    button {
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    pre {
+      margin-top: 20px;
+      background: #0f172a;
+      color: #a7f3d0;
+      padding: 16px;
+      border-radius: var(--radius);
+      overflow: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+    .badge-yes { background: #dcfce7; color: #166534; }
+    .badge-no { background: #fee2e2; color: #991b1b; }
+    a { color: var(--brand); }
+    .hint { margin: 8px 0 0; font-size: 0.8rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Demo — Image Compare (DINOv2)</h1>
+    <p class="sub">
+      Tier 2 duplicate detection — chọn 2 ảnh từ máy →
+      <code>POST /api/v1/compare-images-upload</code>.
+      <a href="/demo/demo_capture_classify.html">Detection classify demo</a>
+    </p>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Ảnh A — báo cáo mới</h2>
+        <input type="file" id="fileA" accept="image/*,.heic,.heif" />
+        <img id="previewA" class="preview" alt="Preview A" hidden />
+        <p id="hintA" class="hint" hidden></p>
+      </div>
+      <div class="card">
+        <h2>Ảnh B — candidate</h2>
+        <input type="file" id="fileB" accept="image/*,.heic,.heif" />
+        <img id="previewB" class="preview" alt="Preview B" hidden />
+        <p id="hintB" class="hint" hidden></p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="compareBtn" disabled>So sánh ảnh</button>
+    </div>
+
+    <pre id="result">Chọn 2 ảnh rồi bấm So sánh.</pre>
+  </div>
+
+  <script>
+    var fileA = document.getElementById("fileA");
+    var fileB = document.getElementById("fileB");
+    var previewA = document.getElementById("previewA");
+    var previewB = document.getElementById("previewB");
+    var compareBtn = document.getElementById("compareBtn");
+    var resultEl = document.getElementById("result");
+
+    function isHeicFile(file) {
+      if (!file) return false;
+      var name = (file.name || "").toLowerCase();
+      var t = (file.type || "").toLowerCase();
+      return (
+        name.endsWith(".heic") ||
+        name.endsWith(".heif") ||
+        t === "image/heic" ||
+        t === "image/heif"
+      );
+    }
+
+    function previewBlob(img, hintEl, blob) {
+      if (img._previewUrl) URL.revokeObjectURL(img._previewUrl);
+      img._previewUrl = URL.createObjectURL(blob);
+      img.src = img._previewUrl;
+      img.hidden = false;
+      if (hintEl) hintEl.hidden = true;
+    }
+
+    function showPreviewHint(hintEl, msg) {
+      if (!hintEl) return;
+      hintEl.textContent = msg;
+      hintEl.hidden = false;
+    }
+
+    function loadPreview(input, img, hintEl) {
+      var f = input.files && input.files[0];
+      if (!f) {
+        img.hidden = true;
+        img.removeAttribute("src");
+        if (hintEl) hintEl.hidden = true;
+        updateBtn();
+        return;
+      }
+
+      if (!isHeicFile(f)) {
+        previewBlob(img, hintEl, f);
+        updateBtn();
+        return;
+      }
+
+      img.hidden = true;
+      showPreviewHint(hintEl, "Đang chuyển HEIC → JPG để xem trước…");
+      var fd = new FormData();
+      fd.append("image", f, f.name || "photo.heic");
+      fetch("/api/v1/images/normalize", { method: "POST", body: fd })
+        .then(function (res) {
+          if (!res.ok) throw new Error("Chuyển HEIC thất bại (" + res.status + ")");
+          return res.blob();
+        })
+        .then(function (blob) {
+          previewBlob(img, hintEl, blob);
+          updateBtn();
+        })
+        .catch(function (err) {
+          showPreviewHint(hintEl, "Không xem trước được HEIC: " + err.message + " (vẫn so sánh được khi bấm nút)");
+          updateBtn();
+        });
+    }
+
+    function bindPreview(input, img, hintEl) {
+      input.addEventListener("change", function () {
+        loadPreview(input, img, hintEl);
+      });
+    }
+
+    function updateBtn() {
+      compareBtn.disabled = !(fileA.files && fileA.files[0] && fileB.files && fileB.files[0]);
+    }
+
+    bindPreview(fileA, previewA, document.getElementById("hintA"));
+    bindPreview(fileB, previewB, document.getElementById("hintB"));
+
+    compareBtn.addEventListener("click", function () {
+      var fa = fileA.files[0];
+      var fb = fileB.files[0];
+      if (!fa || !fb) return;
+
+      var fd = new FormData();
+      fd.append("image_a", fa, fa.name || "image_a.jpg");
+      fd.append("image_b", fb, fb.name || "image_b.jpg");
+
+      compareBtn.disabled = true;
+      resultEl.textContent = "Đang so sánh (lần đầu có thể chậm do load DINOv2)…";
+
+      fetch("/api/v1/compare-images-upload", { method: "POST", body: fd })
+        .then(function (r) {
+          return r.text().then(function (text) {
+            if (!r.ok) {
+              try {
+                var err = JSON.parse(text);
+                throw new Error(err.detail || text);
+              } catch (e) {
+                if (e.message && e.message !== text) throw e;
+                throw new Error(text || String(r.status));
+              }
+            }
+            return JSON.parse(text);
+          });
+        })
+        .then(function (data) {
+          var badge = data.is_same_scene
+            ? "CÙNG CẢNH (is_same_scene = true)"
+            : "KHÁC CẢNH (is_same_scene = false)";
+          resultEl.textContent =
+            badge + "\n\n" +
+            "confidence: " + data.confidence + " (0–1, càng cao càng giống)\n" +
+            "model: " + data.model + "\n" +
+            "processing_time_ms: " + data.processing_time_ms + "\n\n" +
+            "Ngưỡng mặc định: confidence >= 0.80 → is_same_scene\n\n" +
+            JSON.stringify(data, null, 2);
+        })
+        .catch(function (err) {
+          resultEl.textContent = "Lỗi: " + err.message;
+        })
+        .finally(function () {
+          updateBtn();
+        });
+    });
+  </script>
+</body>
+</html>
