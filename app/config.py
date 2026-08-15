@@ -2,6 +2,7 @@
 
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
+        populate_by_name=True,
     )
 
     # App
@@ -66,6 +68,33 @@ class Settings(BaseSettings):
     # Trash subtype classifier (EfficientNet-B0) — empty string disables it
     trash_subtype_model_path: str = ""
     trash_subtype_threshold: float = 0.40  # min confidence to report a subtype (vs UNKNOWN)
+
+    # ── Image compare (DINOv2) — BR-REP-030/BR-AI-002 Tier 2 duplicate detection ──
+    compare_model_name: str = Field(
+        default="facebook/dinov2-base",
+        validation_alias="COMPARE_MODEL_NAME",
+        description="HuggingFace model id (e.g. facebook/dinov2-base, facebook/dinov2-small).",
+    )
+    compare_model_version: str = Field(
+        default="dinov2-base",
+        validation_alias="COMPARE_MODEL_VERSION",
+        description="Returned as `model` in API response (BR-AI-005 audit).",
+    )
+    compare_threshold: float = Field(
+        default=0.80,
+        validation_alias="COMPARE_THRESHOLD",
+        description="confidence >= threshold → is_same_scene.",
+    )
+    compare_download_timeout_seconds: float = Field(
+        default=3.0,
+        validation_alias="COMPARE_DOWNLOAD_TIMEOUT_SECONDS",
+        description="Per-image URL fetch timeout for POST /compare-images.",
+    )
+    compare_warmup_on_startup: bool = Field(
+        default=False,
+        validation_alias="COMPARE_WARMUP_ON_STARTUP",
+        description="Preload DINOv2 in lifespan (recommended on prod).",
+    )
 
 
 @lru_cache

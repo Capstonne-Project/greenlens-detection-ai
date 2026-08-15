@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.api.v1 import classify, health, images, training
+from app.api.v1 import classify, compare, health, images, training
 from app.config import get_settings
 from app.utils.logger import get_logger, setup_logging
 
@@ -24,6 +24,11 @@ async def lifespan(app: FastAPI):
         env=settings.app_env,
         port=settings.port,
     )
+    if settings.compare_warmup_on_startup:
+        from app.api.deps import get_image_compare_cached
+
+        loaded = get_image_compare_cached().model_is_loaded()
+        logger.info("compare_model_warmup", loaded=loaded)
     yield
     logger.info("ai_service_stopping")
 
@@ -37,6 +42,7 @@ app = FastAPI(
 
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(classify.router, prefix="/api/v1")
+app.include_router(compare.router, prefix="/api/v1")
 app.include_router(images.router, prefix="/api/v1")
 app.include_router(training.router, prefix="/api/v1")
 
@@ -55,5 +61,6 @@ async def root():
         "version": "0.1.0",
         "docs": "/docs",
         "demo_capture_classify": "/demo/demo_capture_classify.html",
+        "demo_compare_images": "/demo/demo_compare_images.html",
         "demo_training_dashboard": "/demo/demo_training_dashboard.html",
     }
